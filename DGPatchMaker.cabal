@@ -59,6 +59,9 @@ executable DGPatchMaker
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.8 && <4.9,
                        text,
+                       text-format,
+                       vector,
+                       directory,
                        transformers,
                        gtk3
 
