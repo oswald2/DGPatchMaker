@@ -62,6 +62,8 @@ executable DGPatchMaker
                        text-format,
                        vector,
                        directory,
+                       filepath,
+                       parsec3,
                        transformers,
                        gtk3
 
@@ -70,3 +72,31 @@ executable DGPatchMaker
 
   -- Base language which the package is written in.
   default-language:    Haskell2010
+
+
+executable ParseTest
+  -- .hs or .lhs file containing the Main module.
+  main-is:             tests/ParseTest.hs
+
+  -- Modules included in this executable, other than Main.
+  -- other-modules:
+
+  -- LANGUAGE extensions used by modules in this package.
+  -- other-extensions:
+
+  -- Other library packages from which modules are imported.
+  build-depends:       base >=4.8 && <4.9,
+                       text,
+                       text-format,
+                       vector,
+                       directory,
+                       filepath,
+                       parsec3,
+                       transformers
+
+  -- Directories containing source files.
+  hs-source-dirs:      src
+
+  -- Base language which the package is written in.
+  default-language:    Haskell2010
+
