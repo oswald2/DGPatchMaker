@@ -8,7 +8,7 @@ import Prelude as P
 
 import System.FilePath
 import System.Directory
-
+import Data.List (sort)
 import Data.Text as T
 
 
@@ -18,7 +18,7 @@ getFiles path = do
     if is
         then do
             cont' <- getDirectoryContents path
-            let cont = P.filter (\x -> not (elem x [".", ".."])) cont'
+            let cont = sort $ P.filter (\x -> not (elem x [".", ".."])) cont'
             return (Right cont)
         else do
             return (Left (pack path `T.append` " is not a directory"))

@@ -25,6 +25,9 @@ main = do
         Right fs -> do
             let res = map getSampleFromFileName fs
             Prelude.putStrLn "\n\nRights:\n\n"
-            print $ map showSample (rights res)
+            mapM_ printSample (rights res)
             Prelude.putStrLn "\n\nLefts::\n\n"
             print (lefts res)
+
+printSample :: Sample -> IO ()
+printSample x = Prelude.putStrLn (show x)
