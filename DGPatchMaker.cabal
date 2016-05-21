@@ -64,8 +64,13 @@ executable DGPatchMaker
                        directory,
                        filepath,
                        parsec3,
+                       xmlgen,
+                       bytestring,
+                       hsndfile,
                        transformers,
                        gtk3
+
+  ghc-options: -O2 -Wall -rtsopts
 
   -- Directories containing source files.
   hs-source-dirs:      src
@@ -92,7 +97,12 @@ executable ParseTest
                        directory,
                        filepath,
                        parsec3,
+                       xmlgen,
+                       bytestring,
+                       hsndfile,
                        transformers
+
+  ghc-options: -O2 -Wall -rtsopts
 
   -- Directories containing source files.
   hs-source-dirs:      src

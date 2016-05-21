@@ -1,127 +1,124 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 module Data.DrumDrops.Types
-
-
+    (
+    Sample(..),
+    SampleGroup(..),
+    VelocityGroup(..),
+    getMic,
+    velocityGroup,
+    getSampleFromFileName,
+    sampleParser,
+    convertSampleGroup,
+    getMaxVelocity
+    )
 where
 
 
-import Data.Monoid
+import Control.Monad (void)
 
 import Data.Text as T
-import Data.Text.Lazy (toStrict)
-import Data.Text.Lazy.Builder as TL
-import Data.Text.Format
+import Data.Types
+import Data.Maybe (isJust)
 
 import Text.Parsec as P
-import Text.Parsec.Char
+--import Text.Parsec.Char
 
 import System.FilePath
 
 
-showSample :: Sample -> Text
-showSample (CloseSample{..}) =
-    toStrict . toLazyText $ fromText "CloseSample "
-        <> fromText (pack (show saInstrument))
-        <> fromLazyText (format "{}" (Only saVelocity))
-        <> fromLazyText (format "{}" (Only (maybe 0 id saRound)))
-showSample (SubSample{..}) =
-    toStrict . toLazyText $ fromText "SubSample "
-        <> fromText (pack (show saInstrument))
-        <> fromLazyText (format "{}" (Only saVelocity))
-        <> fromLazyText (format "{}" (Only (maybe 0 id saRound)))
-showSample (OverheadsSample{..}) =
-    toStrict . toLazyText $ fromText "OverheadsSample "
-        <> fromText (pack (show saInstrument))
-        <> fromLazyText (format "{}" (Only saVelocity))
-        <> fromLazyText (format "{}" (Only (maybe 0 id saRound)))
-showSample (RoomSample{..}) =
-    toStrict . toLazyText $ fromText "RoomSample "
-        <> fromText (pack (show saInstrument))
-        <> fromLazyText (format "{}" (Only saVelocity))
-        <> fromLazyText (format "{}" (Only (maybe 0 id saRound)))
 
 
 -- data type for the samples
 data Sample =
-    CloseSample {
-        saFileName :: Text,
-        saMaker :: Text,
-        saInstrument :: Instrument,
-        saVelocity :: Int,
-        saRound :: Maybe Int
+    Sample {
+        saFileName :: !Text,
+        saMaker :: !Text,
+        saInstrument :: !Instrument,
+        saInstrumentProperties :: !InstState,
+        saVelocity :: !Int,
+        saRound :: Maybe Int,
+        saType :: !AudioType
     }
-    | SubSample {
-        saFileName :: Text,
-        saMaker :: Text,
-        saInstrument :: Instrument,
-        saVelocity :: Int,
-        saRound :: Maybe Int
-    }
-    | OverheadsSample {
-        saFileName :: Text,
-        saMaker :: Text,
-        saInstrument :: Instrument,
-        saVelocity :: Int,
-        saRound :: Maybe Int
-    }
-    | RoomSample {
-        saFileName :: Text,
-        saMaker :: Text,
-        saInstrument :: Instrument,
-        saVelocity :: Int,
-        saRound :: Maybe Int
-    }
-    deriving Show
+    deriving (Show, Eq)
+
+instance Ord Sample where
+    compare (Sample {saVelocity = v1, saRound = rr1}) (Sample {saVelocity = v2, saRound = rr2}) =
+        if v1 < v2
+            then LT
+            else if v1 == v2
+                then
+                    if isJust rr1 && isJust rr2
+                        then compare rr1 rr2
+                        else EQ
+                else GT
 
 
-data Instrument =
-    Kick
-    | Snare
-    | HiHat
-    | Cymbal
-    | Ride
-    | Tom TomType
-    deriving Show
+data SampleGroup = SampleGroup {
+    sgPath :: FilePath,
+    sgInstName :: Text,
+    sgGroups :: [VelocityGroup]
+} deriving (Show)
 
-data TomType =
-    RackTom Int
-    | Floor Int
-    deriving Show
-
-data MicType =
-    Close
-    | Sub
-    | Overhead
-    | Room
-    deriving Show
-
-data HiHatState =
-    HiHatFullClosed
-    | HiHatClosed
-    | HiHatOpenQuarter
-    | HiHatOpenHalf
-    | HiHatOpen3Quart
-    | HiHatOpen
-    | HiHatPedalShut
-    | HiHatPedalOpen
-    deriving Show
+data VelocityGroup = VelocityGroup {
+    vgVelocity :: Double,
+    vgRR :: Maybe Int,
+    vgSamples :: [Sample]
+} deriving Show
 
 
-data InstState =
-    HiHatS {
-        hState :: HiHatState,
-        hMicType :: MicType
-    }
-    | InstS {
-        hMicType :: MicType
-    }
-    deriving Show
+kickClose :: Text
+kickClose = "KickC"
+
+kickSub :: Text
+kickSub = "KickS"
+
+overheadL :: Text
+overheadL = "OHL"
+
+overheadR :: Text
+overheadR = "OHR"
+
+roomL :: Text
+roomL = "RoomL"
+
+roomR :: Text
+roomR = "RoomL"
 
 
-getMic :: InstState -> MicType
-getMic = hMicType
+data AudioType = Mono | Stereo deriving (Eq, Ord, Enum, Show)
 
 
+convertSampleGroup :: SampleGroup -> InstrumentFile
+convertSampleGroup sg = undefined
+    where
+        maxVel = getMaxVelocity sg
+        convertSample :: Sample -> [AudioFile]
+        convertSample x =
+            AudioFile (determineChannel x) (determinePath (sgPath sg)) (determineFileChannel x)
+
+        --convertVelocityGroup :: VelocityGroup -> HitSample
+        --convertVelocityGroup =
+
+
+determineChannel :: Sample -> Text
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)} = kickClose
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)} = kickClose
+
+
+
+
+getMaxVelocity :: SampleGroup -> Double
+getMaxVelocity (SampleGroup{..}) = Prelude.maximum (Prelude.map vgVelocity sgGroups)
+
+
+velocityGroup :: Sample -> Sample -> Bool
+velocityGroup x1 x2 =
+    let v = saVelocity x1 == saVelocity x2
+        rr (Just rr1) (Just rr2) = rr1 == rr2
+        rr _ _ = True
+        res = v && rr (saRound x1) (saRound x2)
+    in
+    res
 
 getSampleFromFileName :: FilePath -> Either ParseError Sample
 getSampleFromFileName name =
@@ -135,15 +132,15 @@ getSampleFromFileName name =
 sampleParser :: Text -> Parsec Text u Sample
 sampleParser fname = do
     maker' <- many1 upper
-    char '_'
+    void $ char '_'
     inst <- instrument
-    char '_'
+    void $ char '_'
     st <- case inst of
         HiHat -> hiHat
         _ -> instState
-    char '_'
+    void $ char '_'
     kitNumber
-    char '_'
+    void $ char '_'
     v <- velocity
 
     rr <- roundRobin
@@ -151,15 +148,12 @@ sampleParser fname = do
     let
         maker = pack maker'
         res =
-            case getMic st of
-                Close -> CloseSample fname maker inst v rr
-                Sub -> SubSample fname maker inst v rr
-                Overhead -> OverheadsSample fname maker inst v rr
-                Room -> RoomSample fname maker inst v rr
+            Sample fname maker inst st v rr
 
     return res
 
 
+instrument :: Parsec Text u Instrument
 instrument = do
     (try (string "SNR") >> return Snare)
     <|> (try (string "KICK") >> return Kick)
@@ -169,18 +163,20 @@ instrument = do
     <|> (try (string "RIDE") >> return Ride)
 
 
+toms :: Parsec Text u Instrument
 toms = do
     t <- try $ do
-            char 'R'
+            void $ char 'R'
             n <- digit
             return (RackTom (read [n]))
         <|> do
-            char 'F'
+            void $ char 'F'
             return (Floor 1)
-    string "TM"
+    void $ string "TM"
     return (Tom t)
 
 
+micType :: Parsec Text u MicType
 micType = do
     genTry "CL" Close
     <|> genTry "OH" Overhead
@@ -192,6 +188,7 @@ genTry :: String -> a -> Parsec Text u a
 genTry what whatC = try (string what) >> return whatC
 
 
+hiHatState :: Parsec Text u HiHatState
 hiHatState = do
     genTry "C1" HiHatFullClosed
     <|> genTry "C2" HiHatClosed
@@ -203,40 +200,45 @@ hiHatState = do
     <|> genTry "FO" HiHatPedalOpen
 
 
+hiHat :: Parsec Text u InstState
 hiHat = do
     st <- hiHatState
     mt <- try $ do
-            string "EG"
+            void $ string "EG"
             micType
         <|> do
             micType
     return (HiHatS st mt)
 
+
+instState :: Parsec Text u InstState
 instState = do
-    P.count 2 upper
+    void $ P.count 2 upper
     mt <- micType
     sb <- try (string "SB") <|> return ""
     case sb of
-        "" -> return (InstS mt)
         "SB" -> return (InstS Sub)
-    return (InstS mt)
+        _ -> return (InstS mt)
 
 
+kitNumber :: Parsec Text u ()
 kitNumber = do
-    string "HT_"
-    many1 digit
+    void $ string "HT_"
+    void $ many1 digit
     return ()
 
 
+velocity :: Parsec Text u Int
 velocity = do
-    char 'V'
+    void $ char 'V'
     n <- many1 digit
     return (read n)
 
 
+roundRobin :: Parsec Text u (Maybe Int)
 roundRobin = do
     try $ do
-            string "_RR"
+            void $ string "_RR"
             n <- many1 digit
             return (Just (read n))
         <|>
