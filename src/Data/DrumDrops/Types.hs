@@ -37,7 +37,7 @@ data Sample =
         saInstrumentProperties :: !InstState,
         saVelocity :: !Int,
         saRound :: Maybe Int,
-        saType :: !AudioType
+        saChannels :: !Word
     }
     deriving (Show, Eq)
 
@@ -54,20 +54,28 @@ instance Ord Sample where
 
 
 data SampleGroup = SampleGroup {
-    sgPath :: FilePath,
-    sgInstName :: Text,
+    sgPath :: !FilePath,
+    sgInstName :: !Text,
+    sgInstrument :: !Instrument,
     sgGroups :: [VelocityGroup]
 } deriving (Show)
 
 data VelocityGroup = VelocityGroup {
     vgVelocity :: Double,
     vgRR :: Maybe Int,
+    vgInstrument :: !Instrument,
     vgSamples :: [Sample]
 } deriving Show
 
 
 kickClose :: Text
 kickClose = "KickC"
+
+kickL :: Text
+kickL = "KickL"
+
+kickR :: Text
+kickR = "KickR"
 
 kickSub :: Text
 kickSub = "KickS"
@@ -82,33 +90,74 @@ roomL :: Text
 roomL = "RoomL"
 
 roomR :: Text
-roomR = "RoomL"
+roomR = "RoomR"
 
 
-data AudioType = Mono | Stereo deriving (Eq, Ord, Enum, Show)
 
 
-convertSampleGroup :: SampleGroup -> InstrumentFile
-convertSampleGroup sg = undefined
+convertSampleGroup :: FilePath -> SampleGroup -> InstrumentFile
+convertSampleGroup basepath sg =
+    InstrumentFile "2.0" nm (sgInstrument sg) groups
     where
-        maxVel = getMaxVelocity sg
-        convertSample :: Sample -> [AudioFile]
-        convertSample x =
-            AudioFile (determineChannel x) (determinePath (sgPath sg)) (determineFileChannel x)
+        nm = sgInstName sg
+        vname :: Int -> Text
+        vname i = nm `append` pack (show i)
+        groups = Prelude.zipWith (\vg i -> convertVelocityGroup (vname i) (sgPath sg) basepath vg) (sgGroups sg) [1..]
 
-        --convertVelocityGroup :: VelocityGroup -> HitSample
-        --convertVelocityGroup =
+data Channel =
+    Mono
+    | LeftA | RightA
+    deriving (Show)
 
 
-determineChannel :: Sample -> Text
-determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)} = kickClose
-determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)} = kickClose
+
+convertVelocityGroup :: Text -> FilePath -> FilePath -> VelocityGroup -> HitSample
+convertVelocityGroup name path basepath vg =
+    HitSample name (vgVelocity vg) files
+    where
+        files = Prelude.concatMap (convertSample basepath path) (vgSamples vg)
+
+
+
+convertSample :: FilePath -> FilePath -> Sample -> [AudioFile]
+convertSample basepath path x =
+    case saChannels x of
+        1 -> [AudioFile (determineChannel x Mono) (determinePath basepath path (saFileName x)) 1]
+        2 -> [AudioFile (determineChannel x LeftA) (determinePath basepath path (saFileName x)) 1,
+              AudioFile (determineChannel x RightA) (determinePath basepath path (saFileName x)) 2]
+        _ -> []
+
+
+determineChannel :: Sample -> Channel -> Text
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) Mono =
+    kickClose
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) LeftA =
+    kickL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) RightA =
+    kickR
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Sub)}) Mono =
+    kickSub
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Overhead)}) LeftA =
+    overheadL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Overhead)}) RightA =
+    overheadR
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room)}) LeftA =
+    roomL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room)}) RightA =
+    roomR
+determineChannel _ _ = "UNDEFINED"
+
+
+determinePath :: FilePath -> FilePath -> Text -> FilePath
+determinePath basepath path filename = "../../" </> makeRelative basepath path </> unpack filename
 
 
 
 
 getMaxVelocity :: SampleGroup -> Double
 getMaxVelocity (SampleGroup{..}) = Prelude.maximum (Prelude.map vgVelocity sgGroups)
+
+
 
 
 velocityGroup :: Sample -> Sample -> Bool
@@ -120,17 +169,17 @@ velocityGroup x1 x2 =
     in
     res
 
-getSampleFromFileName :: FilePath -> Either ParseError Sample
-getSampleFromFileName name =
-    parse (sampleParser fname) "" sname
+getSampleFromFileName :: FilePath -> Int -> Either ParseError Sample
+getSampleFromFileName name nChannels =
+    parse (sampleParser fname (fromIntegral nChannels)) "" sname
     where
         fname' = takeFileName name
         fname = pack fname'
         sname = pack $ dropExtension fname'
 
 
-sampleParser :: Text -> Parsec Text u Sample
-sampleParser fname = do
+sampleParser :: Text -> Word -> Parsec Text u Sample
+sampleParser fname nChannels = do
     maker' <- many1 upper
     void $ char '_'
     inst <- instrument
@@ -148,7 +197,7 @@ sampleParser fname = do
     let
         maker = pack maker'
         res =
-            Sample fname maker inst st v rr
+            Sample fname maker inst st v rr nChannels
 
     return res
 

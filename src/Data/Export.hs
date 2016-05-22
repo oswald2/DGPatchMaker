@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 module Data.Export
     (
-    convertToInstrumentXML
+    convertToInstrumentXML,
+    convertToMidiMapXML,
+    convertToDrumkitXML
     )
 where
 
@@ -37,5 +39,30 @@ audiofiles afs =
             xelem "audiofile" (xattr "channel" (afChannel x)
                             <> xattr "file" (pack (afPath x))
                             <> xattr "filechannel" ((pack.show.afFileChannel) x))
+
+
+convertToMidiMapXML :: MidiMap -> B.ByteString
+convertToMidiMapXML (MidiMap mp) = xrender $
+    doc docInfo $
+        xelem "midimap" (xelems (map notes mp))
+    where
+        notes (i, inst) = xelem "map" (xattr "note" (pack (show i)) <> xattr "instr" inst)
+
+
+
+convertToDrumkitXML :: Drumkit -> B.ByteString
+convertToDrumkitXML dr = xrender $
+    doc docInfo $
+        xelem "drumkit" (xattr "name" (dkName dr) <> xattr "description" (dkDescription dr) <#> channels <> instruments)
+    where
+        channels = xelem "channels" (xelems (map ch (dkChannels dr)))
+        ch x = xelem "channel" (xattr "name" x)
+        instruments = xelem "instruments" (xelems (map ins (dkInstruments dr)))
+        ins x = xelem "instrument" (xattr "name" (cmName x) <> gr x <> xattr "file" (pack (cmFile x)) <#> channelmap x)
+        gr x = case cmGroup x of
+                    Just g -> xattr "group" g
+                    Nothing -> mempty
+        channelmap x = xelems (map chm (cmMap x))
+        chm (c1, c2) = xelem "channelmap" (xattr "in" c1 <> xattr "out" c2)
 
 

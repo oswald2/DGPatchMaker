@@ -15,6 +15,8 @@ import Data.Either
 import Data.Char (isSpace)
 import Data.DrumDrops.Types
 
+import Sound.File.Sndfile (getFileInfo, Info(..))
+
 
 getFiles :: FilePath -> IO (Either Text [FilePath])
 getFiles path = do
@@ -33,7 +35,7 @@ getVelocityGroups ss =
     let gs = (L.groupBy velocityGroup . sort) ss
         crV x =
             let first = head x in
-            VelocityGroup (fromIntegral (saVelocity first)) (saRound first) x
+            VelocityGroup (fromIntegral (saVelocity first)) (saRound first) (saInstrument first) x
     in
     map crV gs
 
@@ -43,12 +45,22 @@ getSamples path = do
     case fs of
         Left err -> return (Left err)
         Right cont -> do
-            let res = P.map getSampleFromFileName cont
+            -- get audio information out of the wav files
+            let proc c = do
+                    info <- getFileInfo (path </> c)
+                    return (getSampleFromFileName c (channels info))
+
+            res <- mapM proc cont
+
+            let
                 spls = rights res
                 errors = lefts res
+
             if P.null errors
                 then do
-                    let gr = SampleGroup path (pathToInstrument path) (getVelocityGroups spls)
+                    let gr = SampleGroup path (pathToInstrument path) inst vgs
+                        inst = vgInstrument (head vgs)
+                        vgs = getVelocityGroups spls
                     return (Right gr)
                 else do
                     let err = "Failed parsing: " `append` pack (show errors)

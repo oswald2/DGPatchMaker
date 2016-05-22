@@ -68,6 +68,7 @@ executable DGPatchMaker
                        bytestring,
                        hsndfile,
                        transformers,
+                       containers,
                        gtk3
 
   ghc-options: -O2 -Wall -rtsopts
@@ -100,7 +101,8 @@ executable ParseTest
                        xmlgen,
                        bytestring,
                        hsndfile,
-                       transformers
+                       transformers,
+                       containers
 
   ghc-options: -O2 -Wall -rtsopts
 

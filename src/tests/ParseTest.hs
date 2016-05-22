@@ -24,6 +24,8 @@ str1 = "MPEX_KICK_EQCL_HT_005_V1_RR1.wav"
 path :: FilePath
 path = "/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples/Kontakt Pack Samples/Mapex Kick Drum/EQ Head"
 
+basepath :: FilePath
+basepath = "/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples"
 
 
 main :: IO ()
@@ -34,16 +36,21 @@ main = do
         Left err -> T.putStrLn err
         Right groups -> do
             -- printSampleGroup groups
-            let basepath = "/home/oswald/tmp"
+            let
                 dgInstrumentsPath = getInstrumentDir basepath
 
             dir <- createDrumgizmoDirectories basepath
             case dir of
                 Left err -> T.putStrLn err
                 Right () -> do
-                    let content = convertToInstrumentXML (convertSampleGroup groups)
+
+                    -- create the instrument file
+                    let content = convertToInstrumentXML (convertSampleGroup basepath groups)
                         filename = dgInstrumentsPath </> T.unpack (sgInstName groups) <.> "xml"
                     B.writeFile filename content
+
+                    -- create the drumkit
+
 
 
 
