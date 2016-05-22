@@ -68,31 +68,6 @@ data VelocityGroup = VelocityGroup {
 } deriving Show
 
 
-kickClose :: Text
-kickClose = "KickC"
-
-kickL :: Text
-kickL = "KickL"
-
-kickR :: Text
-kickR = "KickR"
-
-kickSub :: Text
-kickSub = "KickS"
-
-overheadL :: Text
-overheadL = "OHL"
-
-overheadR :: Text
-overheadR = "OHR"
-
-roomL :: Text
-roomL = "RoomL"
-
-roomR :: Text
-roomR = "RoomR"
-
-
 
 
 convertSampleGroup :: FilePath -> SampleGroup -> InstrumentFile
@@ -128,24 +103,24 @@ convertSample basepath path x =
         _ -> []
 
 
-determineChannel :: Sample -> Channel -> Text
+determineChannel :: Sample -> Channel -> Microphones
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) Mono =
-    kickClose
+    KickC
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) LeftA =
-    kickL
+    KickL
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) RightA =
-    kickR
+    KickR
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Sub)}) Mono =
-    kickSub
+    KickS
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Overhead)}) LeftA =
-    overheadL
+    OHL
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Overhead)}) RightA =
-    overheadR
+    OHR
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room)}) LeftA =
-    roomL
+    RoomL
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room)}) RightA =
-    roomR
-determineChannel _ _ = "UNDEFINED"
+    RoomR
+determineChannel _ _ = Undefined
 
 
 determinePath :: FilePath -> FilePath -> Text -> FilePath

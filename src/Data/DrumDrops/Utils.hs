@@ -15,7 +15,19 @@ import Data.Either
 import Data.Char (isSpace)
 import Data.DrumDrops.Types
 
+import Data.Types
+
 import Sound.File.Sndfile (getFileInfo, Info(..))
+
+
+
+importInstrument :: FilePath -> FilePath -> IO (Either Text InstrumentFile)
+importInstrument basepath path = do
+    w <- getSamples path
+    case w of
+        Left err -> return (Left err)
+        Right wavFiles -> return (Right (convertSampleGroup basepath wavFiles))
+
 
 
 getFiles :: FilePath -> IO (Either Text [FilePath])

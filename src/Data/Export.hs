@@ -36,7 +36,7 @@ audiofiles afs =
     xelems $ map audioF afs
     where
         audioF x =
-            xelem "audiofile" (xattr "channel" (afChannel x)
+            xelem "audiofile" (xattr "channel" (pack (show (afChannel x)))
                             <> xattr "file" (pack (afPath x))
                             <> xattr "filechannel" ((pack.show.afFileChannel) x))
 
@@ -56,7 +56,7 @@ convertToDrumkitXML dr = xrender $
         xelem "drumkit" (xattr "name" (dkName dr) <> xattr "description" (dkDescription dr) <#> channels <> instruments)
     where
         channels = xelem "channels" (xelems (map ch (dkChannels dr)))
-        ch x = xelem "channel" (xattr "name" x)
+        ch x = xelem "channel" (xattr "name" (pack (show x)))
         instruments = xelem "instruments" (xelems (map ins (dkInstruments dr)))
         ins x = xelem "instrument" (xattr "name" (cmName x) <> gr x <> xattr "file" (pack (cmFile x)) <#> channelmap x)
         gr x = case cmGroup x of

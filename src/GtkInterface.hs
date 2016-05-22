@@ -7,23 +7,17 @@ import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
 
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.Builder
 
 import Data.Text
 
+import Gtk.MainWindow
 import Gtk.InstrumentFrame
 
-
-data MainWindow = MainWindow {
-    guiWindow :: Window,
-    guiNotebook :: Notebook,
-    guiNotebookInstruments :: Notebook
-}
 
 
 initMainWindow :: IO MainWindow
 initMainWindow = do
-    initGUI
+    void initGUI
     -- Create the builder, and load the UI file
     builder <- builderNew
 
@@ -39,19 +33,26 @@ initMainWindow = do
     itemQuit <- builderGetObject builder castToMenuItem ("menuitemQuit" :: Text)
     notebookInstruments <- builderGetObject builder castToNotebook ("notebookInstruments" :: Text)
 
-    inst <- newInstrumentPage
-
-    notebookAppendPage notebookInstruments (getMainBox inst) ("Instrument 1" :: Text)
+    buttonNewInstrument <- builderGetObject builder castToButton ("buttonNewInstrument" :: Text)
+    buttonSetBaseDir <- builderGetObject builder castToButton ("buttonSetBaseDir" :: Text)
+    entryBaseDirectory <- builderGetObject builder castToEntry ("entryBaseDirectory" :: Text)
+    entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples" :: FilePath)
 
     let gui = MainWindow {
         guiWindow = window,
         guiNotebook = notebook,
-        guiNotebookInstruments = notebookInstruments
+        guiNotebookInstruments = notebookInstruments,
+        guiBaseDir = entryBaseDirectory
         }
 
+    inst <- newInstrumentPage gui
+    void $ notebookAppendPage notebookInstruments (getMainBox inst) ("Instrument 1" :: Text)
+
     -- set termination
-    window `on` deleteEvent $ liftIO quit
-    on itemQuit menuItemActivate (void quit)
+    void $ window `on` deleteEvent $ liftIO quit
+    void $ on itemQuit menuItemActivate (void quit)
+
+    void $ on buttonSetBaseDir buttonActivated $ setBaseDir gui
 
 
     -- setup about dialog
@@ -72,6 +73,35 @@ gtkInterfaceMainLoop = do
     mainGUI
 
 
+quit :: IO Bool
 quit = do
     mainQuit
     return False
+
+
+setBaseDir :: MainWindow -> IO ()
+setBaseDir mainWindow = do
+    let parentWindow = guiWindow mainWindow
+    dialog <- fileChooserDialogNew
+              (Just $ ("Set Base Directory for Imports" :: Text))             --dialog title
+              (Just parentWindow)                     --the parent window
+              FileChooserActionSelectFolder                         --the kind of dialog we want
+              [("gtk-cancel"                                --The buttons to display
+               ,ResponseCancel)
+              ,("gtk-open"
+               , ResponseAccept)]
+
+    widgetShow dialog
+    resp <- dialogRun dialog
+    case resp of
+        ResponseAccept -> do
+            f <- fileChooserGetFilename dialog
+            case f of
+                Nothing -> return ()
+                Just directory -> do
+                    entrySetText (guiBaseDir mainWindow) directory
+                    return ()
+        ResponseCancel -> return ()
+        ResponseDeleteEvent -> return ()
+        _ -> return ()
+    widgetHide dialog

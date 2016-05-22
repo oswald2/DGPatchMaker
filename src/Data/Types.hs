@@ -12,7 +12,7 @@ import System.FilePath
 data Drumkit = Drumkit {
     dkName :: !Text,
     dkDescription :: !Text,
-    dkChannels :: [Text],
+    dkChannels :: [Microphones],
     dkInstruments :: [ChannelMap]
 } deriving (Show)
 
@@ -31,10 +31,23 @@ data Instrument =
     Kick
     | Snare
     | HiHat
+    | Tom TomType
     | Cymbal
     | Ride
-    | Tom TomType
     deriving (Show, Eq)
+
+instance Ord Instrument where
+    compare x1 x2 = compare (toNumber x1) (toNumber x2)
+
+toNumber :: Instrument -> Int
+toNumber Kick = 1
+toNumber Snare = 2
+toNumber HiHat = 3
+toNumber (Tom _) = 4
+toNumber Cymbal = 5
+toNumber Ride = 6
+
+
 
 data TomType =
     RackTom !Int
@@ -92,36 +105,60 @@ data HitSample = HitSample {
 
 
 data AudioFile = AudioFile {
-    afChannel:: !Text,
+    afChannel:: !Microphones,
     afPath :: !FilePath,
     afFileChannel :: !Word
 } deriving Show
+
+data Microphones =
+    KickC
+    | KickL
+    | KickR
+    | KickS
+    | OHL
+    | OHR
+    | RoomL
+    | RoomR
+    | Undefined
+    deriving (Show, Eq, Enum, Ord)
+
+
+
 
 
 generateDrumkit :: Text -> Text -> [InstrumentFile] -> Drumkit
 generateDrumkit name description ifl = res
     where
-        res = Drumkit name description channels undefined
+        res = Drumkit name description channels chanMap
         channels' = getAvailableChannels ifl
-        channels = toList channels'
+        channels = toAscList channels'
+
+        chanMap = Prelude.map instrumentFileToChannelMap ifl
 
 
 instrumentFileToChannelMap :: InstrumentFile -> ChannelMap
 instrumentFileToChannelMap ifl =
-    ChannelMap (ifName ifl) grp filePath undefined
+    ChannelMap (ifName ifl) grp filePath chans
     where
         filePath = "Instruments" </> unpack (ifName ifl) <.> "xml"
         grp | ifType ifl == HiHat = Just "hihat"
             | otherwise = Nothing
+        chans' = getAvailableChannelsIF ifl S.empty
+        chans = Prelude.map (\x -> (x, x)) . Prelude.map (pack . show) $ toAscList chans'
 
 
-getAvailableChannelsIF :: InstrumentFile -> Set Text -> Set Text
+
+getAvailableChannelsIF :: InstrumentFile -> Set Microphones -> Set Microphones
 getAvailableChannelsIF ifl set = Prelude.foldr acc1 set (ifSamples ifl)
     where
         acc1 hs s = Prelude.foldr acc s (hsSamples hs)
         acc af s1 = S.insert (afChannel af) s1
 
 
-getAvailableChannels :: [InstrumentFile] -> Set Text
+getAvailableChannels :: [InstrumentFile] -> Set Microphones
 getAvailableChannels ifl = Prelude.foldr getAvailableChannelsIF S.empty ifl
 
+
+
+getInstrumentNames :: Drumkit -> [Text]
+getInstrumentNames dk = Prelude.map cmName $ dkInstruments dk

@@ -17,6 +17,8 @@ import qualified Data.ByteString.Lazy as B
 import Data.Drumgizmo
 import Data.Export
 
+import Data.Types
+
 
 str1 :: String
 str1 = "MPEX_KICK_EQCL_HT_005_V1_RR1.wav"
@@ -31,26 +33,37 @@ basepath = "/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Konta
 main :: IO ()
 main = do
 
-    files <- getSamples path
-    case files of
+    let
+        dgInstrumentsPath = getInstrumentDir basepath
+        dgPath = getDrumgizmoDir basepath
+
+    dir <- createDrumgizmoDirectories basepath
+    case dir of
         Left err -> T.putStrLn err
-        Right groups -> do
-            -- printSampleGroup groups
-            let
-                dgInstrumentsPath = getInstrumentDir basepath
+        Right () -> do
 
-            dir <- createDrumgizmoDirectories basepath
-            case dir of
+            -- create the instrument file
+            w <- importInstrument basepath path
+            case w of
                 Left err -> T.putStrLn err
-                Right () -> do
-
-                    -- create the instrument file
-                    let content = convertToInstrumentXML (convertSampleGroup basepath groups)
-                        filename = dgInstrumentsPath </> T.unpack (sgInstName groups) <.> "xml"
+                Right instrumentFile -> do
+                    let
+                        content = convertToInstrumentXML instrumentFile
+                        filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
                     B.writeFile filename content
 
                     -- create the drumkit
+                    let drumkit = generateDrumkit "TestKit" "This is a description" [instrumentFile]
+                        drumkitCont = convertToDrumkitXML drumkit
+                        drumkitFName = dgPath </> unpack (dkName drumkit) <.> ".xml"
+                    B.writeFile drumkitFName drumkitCont
 
+                    -- create the midimap
+                    let mm = MidiMap (Prelude.zip [35..] insts)
+                        insts = getInstrumentNames drumkit
+                        midimapCont = convertToMidiMapXML mm
+                        midiMapFName = dgPath </> unpack (dkName drumkit) ++ "_MidiMap" <.> ".xml"
+                    B.writeFile midiMapFName midimapCont
 
 
 

@@ -7,32 +7,44 @@ module Gtk.InstrumentFrame
     )
 where
 
+import Control.Monad (void)
+import Control.Monad.IO.Class (liftIO)
 
 import Prelude as P
 
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.Builder
+--import Graphics.UI.Gtk.Builder
 
 import Data.Text as T
-import qualified Data.Text.Lazy as TL
-import Data.Text.Format
+--import qualified Data.Text.Lazy as TL
+--import Data.Text.Format
 
-import Data.HitSample
+import Data.Types
+import Data.IORef
+
+import Data.DrumDrops.Utils
+
+import Gtk.MainWindow
 
 
 data InstrumentPage = InstrumentPage {
     guiInstMainBox :: Box,
+    guiMainWindow :: MainWindow,
     guiInstHitView :: TreeView,
     guiInstHitViewModel :: ListStore HitSample,
     guiInstSamplesView :: TreeView,
-    guiInstSamplesViewModel :: ListStore Sample
+    guiInstSamplesViewModel :: ListStore AudioFile,
+    guiInstFile :: IORef (Maybe InstrumentFile),
+    guiEntryVersion :: Entry,
+    guiEntryName :: Entry,
+    guiEntryType :: Entry
     }
 
 
 
 
-newInstrumentPage :: IO InstrumentPage
-newInstrumentPage = do
+newInstrumentPage :: MainWindow -> IO InstrumentPage
+newInstrumentPage parentWindow = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
@@ -44,21 +56,86 @@ newInstrumentPage = do
     treeviewHit <- builderGetObject builder castToTreeView ("treeviewHit" :: Text)
     treeviewSamples <- builderGetObject builder castToTreeView ("treeviewSamples" :: Text)
 
+    buttonOpenSamples <- builderGetObject builder castToButton ("buttonOpenSamples" :: Text)
+    buttonImportInstrument <- builderGetObject builder castToButton ("buttonImportInstrument" :: Text)
+    buttonExportInstrument <- builderGetObject builder castToButton ("buttonExportInstrument" :: Text)
+
+    entryVersion <- builderGetObject builder castToEntry ("entryVersion" :: Text)
+    entryName <- builderGetObject builder castToEntry ("entryName" :: Text)
+    entryType <- builderGetObject builder castToEntry ("entryType" :: Text)
+
     hsls <- listStoreNew []
     initTreeViewHit treeviewHit hsls
 
     sals <- listStoreNew []
     initTreeViewSamples treeviewSamples sals
 
+    ifr <- newIORef Nothing
+
     let gui = InstrumentPage {
         guiInstMainBox = mainBox,
+        guiMainWindow = parentWindow,
         guiInstHitView = treeviewHit,
         guiInstHitViewModel = hsls,
         guiInstSamplesView = treeviewSamples,
-        guiInstSamplesViewModel = sals
+        guiInstSamplesViewModel = sals,
+        guiInstFile = ifr,
+        guiEntryVersion = entryVersion,
+        guiEntryName = entryName,
+        guiEntryType = entryType
+
         }
 
+    void $ on buttonImportInstrument buttonActivated (importDrumDropsInstrument parentWindow gui)
+
+
     return gui
+
+
+importDrumDropsInstrument :: MainWindow -> InstrumentPage -> IO ()
+importDrumDropsInstrument mainWindow instPage = do
+    let parentWindow = guiWindow mainWindow
+
+    dialog <- fileChooserDialogNew
+                (Just $ ("Import DrumDrops Instrument from Path" :: Text))             --dialog title
+                (Just parentWindow)                     --the parent window
+                FileChooserActionSelectFolder                         --the kind of dialog we want
+                [("gtk-cancel"                                --The buttons to display
+                 ,ResponseCancel)
+                 ,("gtk-open"
+                 , ResponseAccept)]
+
+    basedir <- entryGetText (guiBaseDir mainWindow)
+    case basedir of
+        "" -> do
+            dial <- messageDialogNew (Just parentWindow) [DialogDestroyWithParent] MessageError ButtonsClose ("Base Directory not set!" :: Text)
+            _ <- dialogRun dial
+            widgetHide dial
+            return ()
+        _ -> do
+            void $ fileChooserSetCurrentFolder dialog basedir
+
+            widgetShow dialog
+            resp <- dialogRun dialog
+            case resp of
+                ResponseAccept -> do
+                    Just instrumentDir <- fileChooserGetFilename dialog
+
+                    result <- importInstrument basedir instrumentDir
+                    case result of
+                        Right instrumentFile -> do
+                            setInstrumentFile instPage instrumentFile
+                            return ()
+                        Left err -> do
+                            dial <- messageDialogNew (Just parentWindow) [DialogDestroyWithParent] MessageError ButtonsClose ("Could not import samples: " `append` err)
+                            _ <- dialogRun dial
+                            widgetHide dial
+                            return ()
+                ResponseCancel -> return ()
+                ResponseDeleteEvent -> return ()
+                _ -> return ()
+    widgetHide dialog
+
 
 
 getMainBox :: InstrumentPage -> Box
@@ -85,7 +162,7 @@ initTreeViewHit tv ls = do
     cellLayoutPackStart col2 renderer2 True
 
     cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := hsName hs]
-    cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := hsPowerAsString hs ]
+    cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := pack (show (hsPower hs)) ]
 
     _ <- treeViewAppendColumn tv col1
     _ <- treeViewAppendColumn tv col2
@@ -101,7 +178,7 @@ initTreeViewHit tv ls = do
 
 
 
-initTreeViewSamples :: TreeView -> ListStore Sample -> IO ()
+initTreeViewSamples :: TreeView -> ListStore AudioFile -> IO ()
 initTreeViewSamples tv ls = do
     treeViewSetModel tv ls
 
@@ -124,9 +201,9 @@ initTreeViewSamples tv ls = do
     cellLayoutPackStart col2 renderer2 True
     cellLayoutPackStart col3 renderer3 True
 
-    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := saChannel hs]
-    cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := saName hs ]
-    cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := saFileChannelAsText hs ]
+    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := pack (show (afChannel hs))]
+    cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := afPath hs ]
+    cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := pack (show (afFileChannel hs)) ]
 
     _ <- treeViewAppendColumn tv col1
     _ <- treeViewAppendColumn tv col2
@@ -135,6 +212,30 @@ initTreeViewSamples tv ls = do
     treeViewSetSearchEqualFunc tv $ Just $ \str iter -> do
         (i:_) <- treeModelGetPath ls iter
         row <- listStoreGetValue ls i
-        return $ toLower str `T.isPrefixOf` toLower (saName row)
+        return $ toLower str `T.isPrefixOf` toLower (pack (afPath row))
+
+    return ()
+
+
+setInstrumentFile :: InstrumentPage -> InstrumentFile -> IO ()
+setInstrumentFile instPage instrumentFile = do
+    let ref = guiInstFile instPage
+    writeIORef ref (Just instrumentFile)
+
+    let notebook = guiNotebookInstruments (guiMainWindow instPage)
+    currentPage <- notebookGetCurrentPage notebook
+    page <- notebookGetNthPage notebook currentPage
+    case page of
+        Just p -> notebookSetTabLabelText notebook p (ifName instrumentFile)
+        Nothing -> return ()
+
+    entrySetText (guiEntryVersion instPage) (ifVersion instrumentFile)
+    entrySetText (guiEntryName instPage) (ifName instrumentFile)
+    entrySetText (guiEntryType instPage) ((pack.show.ifType) instrumentFile)
+
+    let model = guiInstHitViewModel instPage
+
+    listStoreClear model
+    mapM_ (listStoreAppend model) (ifSamples instrumentFile)
 
     return ()
