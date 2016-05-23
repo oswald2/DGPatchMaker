@@ -109,7 +109,6 @@
               <object class="GtkEntry" id="entryName">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
-                <property name="editable">False</property>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -134,7 +133,6 @@
               <object class="GtkEntry" id="entryType">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
-                <property name="editable">False</property>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -192,6 +190,7 @@
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
                                 <property name="rules_hint">True</property>
+                                <property name="show_expanders">False</property>
                                 <property name="enable_grid_lines">horizontal</property>
                                 <child internal-child="selection">
                                   <object class="GtkTreeSelection" id="treeview-selection1"/>
@@ -248,6 +247,7 @@
                                 <property name="visible">True</property>
                                 <property name="can_focus">True</property>
                                 <property name="rules_hint">True</property>
+                                <property name="show_expanders">False</property>
                                 <property name="enable_grid_lines">horizontal</property>
                                 <property name="enable_tree_lines">True</property>
                                 <child internal-child="selection">
@@ -292,6 +292,26 @@
         <property name="fill">True</property>
         <property name="position">1</property>
       </packing>
+    </child>
+  </object>
+  <object class="GtkMenu" id="menuAudioSamples">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <child>
+      <object class="GtkMenuItem" id="menuitemAdd">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="label" translatable="yes">Add Samples</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="menuitemRemove">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="label" translatable="yes">Remove Sample</property>
+        <property name="use_underline">True</property>
+      </object>
     </child>
   </object>
 </interface>

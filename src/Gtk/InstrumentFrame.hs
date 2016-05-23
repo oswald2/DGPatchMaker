@@ -8,7 +8,7 @@ module Gtk.InstrumentFrame
 where
 
 import Control.Monad (void)
---import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO)
 
 import Prelude as P
 
@@ -40,7 +40,8 @@ data InstrumentPage = InstrumentPage {
     guiInstFile :: IORef (Maybe InstrumentFile),
     guiEntryVersion :: Entry,
     guiEntryName :: Entry,
-    guiEntryType :: Entry
+    guiEntryType :: Entry,
+    guiAudioSamplesMenu :: Menu
     }
 
 
@@ -67,6 +68,10 @@ newInstrumentPage parentWindow = do
     entryName <- builderGetObject builder castToEntry ("entryName" :: Text)
     entryType <- builderGetObject builder castToEntry ("entryType" :: Text)
 
+    popUp <- builderGetObject builder castToMenu ("menuAudioSamples" :: Text)
+    menuAddSamples <- builderGetObject builder castToMenuItem ("menuitemAdd" :: Text)
+    menuRemoveSample <- builderGetObject builder castToMenuItem ("menuitemRemove" :: Text)
+
     hsls <- listStoreNew []
     rendererHP <- cellRendererTextNew
     initTreeViewHit treeviewHit hsls rendererHP
@@ -87,12 +92,17 @@ newInstrumentPage parentWindow = do
         guiEntryVersion = entryVersion,
         guiEntryName = entryName,
         guiEntryType = entryType,
-        guiRendererHP = rendererHP
+        guiRendererHP = rendererHP,
+        guiAudioSamplesMenu = popUp
 
         }
 
     -- setup the callback for the import button
     void $ on buttonImportInstrument buttonActivated (importDrumDropsInstrument parentWindow gui)
+
+    void $ on menuAddSamples menuItemActivate (addSamples treeviewSamples sals)
+    void $ on menuRemoveSample menuItemActivate (removeSamples treeviewSamples sals)
+
 
     -- setup the local callbacks for the treeviews
     setupCallbacks gui
@@ -268,6 +278,11 @@ setupCallbacks instPage = do
 
         return ()
 
+    void $ on (guiInstSamplesView instPage) buttonPressEvent $ do
+        liftIO $ menuPopup (guiAudioSamplesMenu instPage) Nothing
+        return True
+
+
     void $ on (guiRendererHP instPage) edited $ \[i] str -> do
         val <- listStoreGetValue (guiInstHitViewModel instPage) i
         let res = checkFloat str
@@ -277,6 +292,12 @@ setupCallbacks instPage = do
                 -- set the GTK list store to the new value
                 listStoreSetValue (guiInstHitViewModel instPage) i (val {hsPower = x})
 
-
-
     return ()
+
+
+addSamples :: TreeView -> ListStore AudioFile -> IO ()
+addSamples _ _ = return ()
+
+
+removeSamples :: TreeView -> ListStore AudioFile -> IO ()
+removeSamples _ _ = return ()
