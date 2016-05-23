@@ -8,7 +8,7 @@ module Gtk.InstrumentFrame
 where
 
 import Control.Monad (void)
-import Control.Monad.IO.Class (liftIO)
+--import Control.Monad.IO.Class (liftIO)
 
 import Prelude as P
 
@@ -21,6 +21,8 @@ import Data.Text as T
 
 import Data.Types
 import Data.IORef
+import Data.Checkers
+
 
 import Data.DrumDrops.Utils
 
@@ -32,6 +34,7 @@ data InstrumentPage = InstrumentPage {
     guiMainWindow :: MainWindow,
     guiInstHitView :: TreeView,
     guiInstHitViewModel :: ListStore HitSample,
+    guiRendererHP :: CellRendererText,
     guiInstSamplesView :: TreeView,
     guiInstSamplesViewModel :: ListStore AudioFile,
     guiInstFile :: IORef (Maybe InstrumentFile),
@@ -65,7 +68,8 @@ newInstrumentPage parentWindow = do
     entryType <- builderGetObject builder castToEntry ("entryType" :: Text)
 
     hsls <- listStoreNew []
-    initTreeViewHit treeviewHit hsls
+    rendererHP <- cellRendererTextNew
+    initTreeViewHit treeviewHit hsls rendererHP
 
     sals <- listStoreNew []
     initTreeViewSamples treeviewSamples sals
@@ -82,12 +86,16 @@ newInstrumentPage parentWindow = do
         guiInstFile = ifr,
         guiEntryVersion = entryVersion,
         guiEntryName = entryName,
-        guiEntryType = entryType
+        guiEntryType = entryType,
+        guiRendererHP = rendererHP
 
         }
 
+    -- setup the callback for the import button
     void $ on buttonImportInstrument buttonActivated (importDrumDropsInstrument parentWindow gui)
 
+    -- setup the local callbacks for the treeviews
+    setupCallbacks gui
 
     return gui
 
@@ -142,8 +150,8 @@ getMainBox :: InstrumentPage -> Box
 getMainBox = guiInstMainBox
 
 
-initTreeViewHit :: TreeView -> ListStore HitSample -> IO ()
-initTreeViewHit tv ls = do
+initTreeViewHit :: TreeView -> ListStore HitSample -> CellRendererText -> IO ()
+initTreeViewHit tv ls rendererHP = do
     treeViewSetModel tv ls
 
     treeViewSetHeadersVisible tv True
@@ -156,13 +164,12 @@ initTreeViewHit tv ls = do
     treeViewColumnSetTitle col2 ("Hit Power" :: Text)
 
     renderer1 <- cellRendererTextNew
-    renderer2 <- cellRendererTextNew
 
     cellLayoutPackStart col1 renderer1 True
-    cellLayoutPackStart col2 renderer2 True
+    cellLayoutPackStart col2 rendererHP True
 
     cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := hsName hs]
-    cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := pack (show (hsPower hs)) ]
+    cellLayoutSetAttributes col2 rendererHP ls $ \hs -> [ cellText := pack (show (hsPower hs)) ]
 
     _ <- treeViewAppendColumn tv col1
     _ <- treeViewAppendColumn tv col2
@@ -174,6 +181,8 @@ initTreeViewHit tv ls = do
         return $ toLower str `T.isPrefixOf` toLower (hsName row)
 
     return ()
+
+
 
 
 
@@ -214,6 +223,8 @@ initTreeViewSamples tv ls = do
         row <- listStoreGetValue ls i
         return $ toLower str `T.isPrefixOf` toLower (pack (afPath row))
 
+
+
     return ()
 
 
@@ -235,7 +246,37 @@ setInstrumentFile instPage instrumentFile = do
 
     let model = guiInstHitViewModel instPage
 
-    listStoreClear model
-    mapM_ (listStoreAppend model) (ifSamples instrumentFile)
+    setListStoreTo model (ifSamples instrumentFile)
+
+    return ()
+
+
+setListStoreTo :: ListStore a -> [a] -> IO ()
+setListStoreTo ls xs = do
+    listStoreClear ls
+    mapM_ (listStoreAppend ls) xs
+
+
+setupCallbacks :: InstrumentPage -> IO ()
+setupCallbacks instPage = do
+    let hitview = guiInstHitView instPage
+        hitviewModel = guiInstHitViewModel instPage
+
+    void $ on hitview rowActivated $ \(i:_) _ -> do
+        !row <- listStoreGetValue hitviewModel i
+        setListStoreTo (guiInstSamplesViewModel instPage) (hsSamples row)
+
+        return ()
+
+    void $ on (guiRendererHP instPage) edited $ \[i] str -> do
+        val <- listStoreGetValue (guiInstHitViewModel instPage) i
+        let res = checkFloat str
+        case res of
+            Left err -> displayErrorBox (guiMainWindow instPage) err
+            Right x -> do
+                -- set the GTK list store to the new value
+                listStoreSetValue (guiInstHitViewModel instPage) i (val {hsPower = x})
+
+
 
     return ()
