@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Drumgizmo
 
 where
@@ -36,3 +37,7 @@ createDrumgizmoDirectories path = do
                 let err = show (e :: SomeException)
                 return (Left (pack err))
         )
+
+
+dgDefaultVersion :: Text
+dgDefaultVersion = "2.0"

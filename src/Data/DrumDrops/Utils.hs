@@ -21,9 +21,9 @@ import Sound.File.Sndfile (getFileInfo, Info(..))
 
 
 
-importInstrument :: FilePath -> FilePath -> IO (Either Text InstrumentFile)
-importInstrument basepath path = do
-    w <- getSamples path
+importInstrument :: FilePath -> FilePath -> FilePath -> IO (Either Text InstrumentFile)
+importInstrument basepath samplesPath path = do
+    w <- getSamples samplesPath path
     case w of
         Left err -> return (Left err)
         Right wavFiles -> return (Right (convertSampleGroup basepath wavFiles))
@@ -51,8 +51,8 @@ getVelocityGroups ss =
     in
     map crV gs
 
-getSamples :: FilePath -> IO (Either Text SampleGroup)
-getSamples path = do
+getSamples :: FilePath -> FilePath -> IO (Either Text SampleGroup)
+getSamples samplesDir path = do
     fs <- getFiles path
     case fs of
         Left err -> return (Left err)
@@ -70,7 +70,7 @@ getSamples path = do
 
             if P.null errors
                 then do
-                    let gr = SampleGroup path (pathToInstrument path) inst vgs
+                    let gr = SampleGroup path (pathToInstrument samplesDir path) inst vgs
                         inst = vgInstrument (head vgs)
                         vgs = getVelocityGroups spls
                     return (Right gr)
@@ -79,10 +79,11 @@ getSamples path = do
                     return (Left err)
 
 
-pathToInstrument :: FilePath -> Text
-pathToInstrument path =
-    let fs = splitDirectories path
-        ps = P.concat (takeLastTwo fs)
+pathToInstrument :: FilePath -> FilePath -> Text
+pathToInstrument sampleDir path' =
+    let path = makeRelative sampleDir path'
+        fs = splitDirectories path
+        ps = P.concat fs
         inst = P.filter (not . isSpace) ps
 
         takeLastTwo (x:y:[]) = [x, y]
