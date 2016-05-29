@@ -33,7 +33,8 @@ data MainWindow a = MainWindow {
     guiNotebookInstruments :: Notebook,
     guiBaseDir :: Entry,
     guiSamplesDir :: Entry,
-    guiInstrumentPages :: IORef (Vector a)
+    guiInstrumentPages :: IORef (Vector a),
+    guiProgress :: ProgressBar
 }
 
 displayErrorBox :: MainWindow a -> Text -> IO ()

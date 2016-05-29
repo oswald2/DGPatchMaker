@@ -69,6 +69,7 @@ executable DGPatchMaker
                        hsndfile,
                        transformers,
                        containers,
+                       filemanip,
                        gtk3
 
   ghc-options: -O2 -Wall -rtsopts

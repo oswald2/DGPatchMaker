@@ -85,10 +85,5 @@ pathToInstrument sampleDir path' =
         fs = splitDirectories path
         ps = P.concat fs
         inst = P.filter (not . isSpace) ps
-
-        takeLastTwo (x:y:[]) = [x, y]
-        takeLastTwo (x:[]) = [x]
-        takeLastTwo [] = []
-        takeLastTwo (_:xs) = takeLastTwo xs
     in
     pack inst

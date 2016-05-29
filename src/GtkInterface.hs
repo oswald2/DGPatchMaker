@@ -3,7 +3,7 @@ module GtkInterface
 where
 
 
-import Control.Monad (void)
+import Control.Monad  as M (void, forM_)
 import Control.Monad.IO.Class (liftIO)
 
 import Graphics.UI.Gtk
@@ -45,6 +45,8 @@ initMainWindow = do
     entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples" :: FilePath)
     entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples/Kontakt Pack Samples" :: FilePath)
 
+    progress <- builderGetObject builder castToProgressBar ("progressbar" :: Text)
+
     instPages <- newIORef (V.empty)
 
     let gui = MainWindow {
@@ -53,7 +55,8 @@ initMainWindow = do
         guiNotebookInstruments = notebookInstruments,
         guiBaseDir = entryBaseDirectory,
         guiSamplesDir = entrySamplesDir,
-        guiInstrumentPages = instPages
+        guiInstrumentPages = instPages,
+        guiProgress = progress
         }
 
     inst <- newInstrumentPage gui
@@ -99,11 +102,8 @@ quit = do
     return False
 
 
-insertInstrumentPage :: MainWindow InstrumentPage -> InstrumentPage -> IO ()
-insertInstrumentPage gui instPage = do
-    v <- readIORef (guiInstrumentPages gui)
-    let !v' = v V.++ V.singleton instPage
-    writeIORef (guiInstrumentPages gui) v'
+
+
 
 
 setBaseDir :: MainWindow a -> IO ()

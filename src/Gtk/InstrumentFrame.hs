@@ -4,6 +4,8 @@ module Gtk.InstrumentFrame
     InstrumentPage
     ,newInstrumentPage
     ,getMainBox
+    ,insertInstrumentPage
+    ,setInstrumentFile
     )
 where
 
@@ -27,6 +29,7 @@ import Data.Drumgizmo
 import Data.Export
 import Data.Maybe
 import Data.Char (isSpace)
+import Data.Vector as V
 
 import Data.DrumDrops.Utils
 
@@ -160,7 +163,6 @@ importDrumDropsInstrument instPage = do
                     case result of
                         Right instrumentFile -> do
                             setInstrumentFile instPage instrumentFile
-                            listStoreClear (guiInstSamplesViewModel instPage)
                             return ()
                         Left err -> do
                             dial <- messageDialogNew (Just parentWindow) [DialogDestroyWithParent] MessageError ButtonsClose ("Could not import samples: " `append` err)
@@ -299,6 +301,7 @@ setInstrumentFile instPage instrumentFile = do
     let model = guiInstHitViewModel instPage
 
     setListStoreTo model (ifSamples instrumentFile)
+    listStoreClear (guiInstSamplesViewModel instPage)
 
     return ()
 
@@ -306,7 +309,7 @@ setInstrumentFile instPage instrumentFile = do
 setListStoreTo :: ListStore a -> [a] -> IO ()
 setListStoreTo ls xs = do
     listStoreClear ls
-    mapM_ (listStoreAppend ls) xs
+    P.mapM_ (listStoreAppend ls) xs
 
 
 setupCallbacks :: InstrumentPage -> IO ()
@@ -462,3 +465,11 @@ validateType instPage = do
                 Just instF -> do
                     let !iF' = instF {ifType = x}
                     writeIORef (guiInstFile instPage) (Just iF')
+
+
+
+insertInstrumentPage :: MainWindow InstrumentPage -> InstrumentPage -> IO ()
+insertInstrumentPage gui instPage = do
+    v <- readIORef (guiInstrumentPages gui)
+    let !v' = v V.++ V.singleton instPage
+    writeIORef (guiInstrumentPages gui) v'
