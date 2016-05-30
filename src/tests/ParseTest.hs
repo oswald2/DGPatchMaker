@@ -29,6 +29,8 @@ path = "/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt P
 basepath :: FilePath
 basepath = "/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples"
 
+samplesPath :: FilePath
+samplesPath = "/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples/Kontakt Pack Samples"
 
 main :: IO ()
 main = do
@@ -43,7 +45,7 @@ main = do
         Right () -> do
 
             -- create the instrument file
-            w <- importInstrument basepath path
+            w <- importInstrument basepath samplesPath path
             case w of
                 Left err -> T.putStrLn err
                 Right instrumentFile -> do

@@ -3,10 +3,11 @@ module Data.Types
 
 where
 
-
+import Control.Monad (void)
 import Data.Text
 import Data.Set as S
 import System.FilePath
+import Text.Parsec as P
 
 
 data Drumkit = Drumkit {
@@ -113,22 +114,140 @@ data AudioFile = AudioFile {
     afChannel:: !Microphones,
     afPath :: !FilePath,
     afFileChannel :: !Word
-} deriving Show
+} deriving (Show, Eq)
+
+instance Ord AudioFile where
+    compare x1 x2 = compare (afChannel x1) (afChannel x2)
+
 
 data Microphones =
     KickC
     | KickL
     | KickR
     | KickS
+    | SnareTop
+    | SnareBottom
+    | SnareL
+    | SnareR
+    | HiHatC
+    | HiHatL
+    | HiHatR
+    | TomC Int
+    | TomL Int
+    | TomR Int
+    | FloorTomC Int
+    | FloorTomL Int
+    | FloorTomR Int
     | OHL
     | OHR
     | RoomL
     | RoomR
     | Undefined
-    deriving (Show, Eq, Enum, Ord)
 
 
+instance Show Microphones where
+    show KickC =        "KickC"
+    show KickL =        "KickL"
+    show KickR =        "KickR"
+    show KickS =        "KickS"
+    show SnareTop =     "SnareTop"
+    show SnareBottom =  "SnareBottom"
+    show SnareL =       "SnareL"
+    show SnareR =       "SnareR"
+    show HiHatC =       "HiHatC"
+    show HiHatL =       "HiHatL"
+    show HiHatR =       "HiHatR"
+    show (TomC x) =     "TomC" ++ show x
+    show (TomL x) =     "TomL" ++ show x
+    show (TomR x) =     "TomR" ++ show x
+    show (FloorTomC x) =     "FloorTomC" ++ show x
+    show (FloorTomL x) =     "FloorTomL" ++ show x
+    show (FloorTomR x) =     "FloorTomR" ++ show x
+    show OHL =          "OHL"
+    show OHR =          "OHR"
+    show RoomL =        "RoomL"
+    show RoomR =        "RoomR"
+    show Undefined =    "Undefined"
 
+instance Ord Microphones where
+    compare x1 x2 = compare (micToInt x1) (micToInt x2)
+
+micToInt :: Microphones -> Int
+micToInt KickC = 0
+micToInt KickL = 1
+micToInt KickR = 2
+micToInt KickS = 3
+micToInt SnareTop = 4
+micToInt SnareBottom = 5
+micToInt SnareL = 6
+micToInt SnareR = 7
+micToInt HiHatC = 8
+micToInt HiHatL = 9
+micToInt HiHatR = 10
+micToInt (TomC x) = 10 + x
+micToInt (TomL x) = 20 + x
+micToInt (TomR x) = 30 + x
+micToInt (FloorTomC x) = 40 + x
+micToInt (FloorTomL x) = 50 + x
+micToInt (FloorTomR x) = 60 + x
+micToInt OHL = 70
+micToInt OHR = 71
+micToInt RoomL = 72
+micToInt RoomR = 73
+micToInt Undefined = 100
+
+instance Eq Microphones where
+    x1 == x2 = (micToInt x1) == (micToInt x2)
+
+micParser :: Parsec Text u Microphones
+micParser = do
+    (try (string "KickC"        ) >> return KickC       )
+    <|> (try (string "KickL"        ) >> return KickL       )
+    <|> (try (string "KickR"        ) >> return KickR       )
+    <|> (try (string "KickS"        ) >> return KickS       )
+    <|> (try (string "SnareTop"     ) >> return SnareTop    )
+    <|> (try (string "SnareBottom"  ) >> return SnareBottom )
+    <|> (try (string "SnareL"       ) >> return SnareL      )
+    <|> (try (string "SnareR"       ) >> return SnareR      )
+    <|> (try (string "HiHatC"       ) >> return HiHatC      )
+    <|> (try (string "HiHatL"       ) >> return HiHatL      )
+    <|> (try (string "HiHatR"       ) >> return HiHatR      )
+    <|> do
+        void $ try (string "TomC")
+        n <- many1 digit
+        return (TomC (read n))
+    <|> do
+        void $ try (string "TomL")
+        n <- many1 digit
+        return (TomL (read n))
+    <|> do
+        void $ try (string "TomR")
+        n <- many1 digit
+        return (TomR (read n))
+    <|> do
+        void $ try (string "FloorTomC")
+        n <- many1 digit
+        return (FloorTomC (read n))
+    <|> do
+        void $ try (string "FloorTomL")
+        n <- many1 digit
+        return (FloorTomL (read n))
+    <|> do
+        void $ try (string "FloorTomR")
+        n <- many1 digit
+        return (FloorTomR (read n))
+    <|> (try (string "OHL"          ) >> return OHL         )
+    <|> (try (string "OHR"          ) >> return OHR         )
+    <|> (try (string "RoomL"        ) >> return RoomL       )
+    <|> (try (string "RoomR"        ) >> return RoomR       )
+    <|> return Undefined
+
+
+validateMic :: Text -> Either Text Microphones
+validateMic txt =
+    case parse micParser "" txt of
+        Left err -> Left (pack (show err))
+        Right mic -> Right mic
 
 
 generateDrumkit :: Text -> Text -> [InstrumentFile] -> Drumkit

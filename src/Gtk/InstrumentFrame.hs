@@ -4,12 +4,14 @@ module Gtk.InstrumentFrame
     InstrumentPage
     ,newInstrumentPage
     ,getMainBox
+    ,insertInstrumentPage
+    ,setInstrumentFile
     )
 where
 
 import Control.Monad (void, when)
 import Control.Monad.IO.Class (liftIO)
-import Control.Exception
+--import Control.Exception
 
 import Prelude as P
 
@@ -26,21 +28,27 @@ import Data.IORef
 import Data.Checkers
 import Data.Drumgizmo
 import Data.Export
+import Data.Maybe
 import Data.Char (isSpace)
+import Data.Vector as V
 
 import Data.DrumDrops.Utils
 
+import System.FilePath
+
 import Gtk.MainWindow
 
-import System.FilePath
+--import System.FilePath
 
 
 data InstrumentPage = InstrumentPage {
     guiInstMainBox :: Box,
-    guiMainWindow :: MainWindow,
+    guiMainWindow :: MainWindow InstrumentPage,
     guiInstHitView :: TreeView,
     guiInstHitViewModel :: ListStore HitSample,
     guiRendererHP :: CellRendererText,
+    guiRendererChan :: CellRendererText,
+    guiRendererFileChan :: CellRendererText,
     guiInstSamplesView :: TreeView,
     guiInstSamplesViewModel :: ListStore AudioFile,
     guiInstFile :: IORef (Maybe InstrumentFile),
@@ -53,7 +61,7 @@ data InstrumentPage = InstrumentPage {
 
 
 
-newInstrumentPage :: MainWindow -> IO InstrumentPage
+newInstrumentPage :: MainWindow InstrumentPage -> IO InstrumentPage
 newInstrumentPage parentWindow = do
     -- Create the builder, and load the UI file
     builder <- builderNew
@@ -81,11 +89,10 @@ newInstrumentPage parentWindow = do
     menuRemoveSample <- builderGetObject builder castToMenuItem ("menuitemRemove" :: Text)
 
     hsls <- listStoreNew []
-    rendererHP <- cellRendererTextNew
-    initTreeViewHit treeviewHit hsls rendererHP
+    rendererHP <- initTreeViewHit treeviewHit hsls
 
     sals <- listStoreNew []
-    initTreeViewSamples treeviewSamples sals
+    (rendChan, rendFileChan) <- initTreeViewSamples treeviewSamples sals
 
     ifr <- newIORef Nothing
 
@@ -101,18 +108,25 @@ newInstrumentPage parentWindow = do
         guiEntryName = entryName,
         guiEntryType = entryType,
         guiRendererHP = rendererHP,
-        guiAudioSamplesMenu = popUp
-
+        guiAudioSamplesMenu = popUp,
+        guiRendererChan = rendChan,
+        guiRendererFileChan = rendFileChan
         }
 
     -- set the default values for this instrument page
     entrySetText entryVersion iflDefaultVersion
 
     -- setup the callback for the import button
-    void $ on buttonImportInstrument buttonActivated (importDrumDropsInstrument parentWindow gui)
+    void $ on buttonImportInstrument buttonActivated (importDrumDropsInstrument gui)
     void $ on buttonExportInstrument buttonActivated (exportInstrument gui)
 
+    void $ on entryName entryActivated (validateName gui)
+    void $ on entryName focusOutEvent (liftIO (validateName gui) >> return False)
+    void $ on entryType entryActivated (validateType gui)
+    void $ on entryType focusOutEvent (liftIO (validateType gui) >> return False)
+
     void $ on menuAddSamples menuItemActivate (addSamples treeviewSamples sals)
+    void $ on buttonOpenSamples buttonActivated (addSamples treeviewSamples sals)
     void $ on menuRemoveSample menuItemActivate (removeSamples treeviewSamples sals)
 
     void $ on entryName entryActivated $ do
@@ -127,11 +141,10 @@ newInstrumentPage parentWindow = do
     return gui
 
 
-
-
-importDrumDropsInstrument :: MainWindow -> InstrumentPage -> IO ()
-importDrumDropsInstrument mainWindow instPage = do
-    let parentWindow = guiWindow mainWindow
+importDrumDropsInstrument :: InstrumentPage -> IO ()
+importDrumDropsInstrument instPage = do
+    let mainWindow = guiMainWindow instPage
+        parentWindow = guiWindow mainWindow
 
     dialog <- fileChooserDialogNew
                 (Just $ ("Import DrumDrops Instrument from Path" :: Text))             --dialog title
@@ -143,6 +156,7 @@ importDrumDropsInstrument mainWindow instPage = do
                  , ResponseAccept)]
 
     basedir <- entryGetText (guiBaseDir mainWindow)
+    sampleDir <- entryGetText (guiSamplesDir mainWindow)
     case basedir of
         "" -> do
             dial <- messageDialogNew (Just parentWindow) [DialogDestroyWithParent] MessageError ButtonsClose ("Base Directory not set!" :: Text)
@@ -158,7 +172,7 @@ importDrumDropsInstrument mainWindow instPage = do
                 ResponseAccept -> do
                     Just instrumentDir <- fileChooserGetFilename dialog
 
-                    result <- importInstrument basedir instrumentDir
+                    result <- importInstrument basedir sampleDir instrumentDir
                     case result of
                         Right instrumentFile -> do
                             setInstrumentFile instPage instrumentFile
@@ -179,8 +193,8 @@ getMainBox :: InstrumentPage -> Box
 getMainBox = guiInstMainBox
 
 
-initTreeViewHit :: TreeView -> ListStore HitSample -> CellRendererText -> IO ()
-initTreeViewHit tv ls rendererHP = do
+initTreeViewHit :: TreeView -> ListStore HitSample -> IO CellRendererText
+initTreeViewHit tv ls = do
     treeViewSetModel tv ls
 
     treeViewSetHeadersVisible tv True
@@ -193,9 +207,16 @@ initTreeViewHit tv ls rendererHP = do
     treeViewColumnSetTitle col2 ("Hit Power" :: Text)
 
     renderer1 <- cellRendererTextNew
+    rendererHP <- cellRendererTextNew
 
     cellLayoutPackStart col1 renderer1 True
     cellLayoutPackStart col2 rendererHP True
+
+    set rendererHP [cellTextEditable := True,
+                    cellTextEditableSet := True,
+                    cellTextBackgroundColor := paleYellow,
+                    cellTextBackgroundSet := True
+                    ]
 
     cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := hsName hs]
     cellLayoutSetAttributes col2 rendererHP ls $ \hs -> [ cellText := pack (show (hsPower hs)) ]
@@ -209,14 +230,14 @@ initTreeViewHit tv ls rendererHP = do
         row <- listStoreGetValue ls i
         return $ toLower str `T.isPrefixOf` toLower (hsName row)
 
-    return ()
+    return rendererHP
 
 
 
 
 
 
-initTreeViewSamples :: TreeView -> ListStore AudioFile -> IO ()
+initTreeViewSamples :: TreeView -> ListStore AudioFile -> IO (CellRendererText, CellRendererText)
 initTreeViewSamples tv ls = do
     treeViewSetModel tv ls
 
@@ -239,12 +260,25 @@ initTreeViewSamples tv ls = do
     cellLayoutPackStart col2 renderer2 True
     cellLayoutPackStart col3 renderer3 True
 
+    set renderer1 [cellTextEditable := True,
+                    cellTextEditableSet := True,
+                    cellTextBackgroundColor := paleYellow,
+                    cellTextBackgroundSet := True
+                    ]
+    set renderer3 [cellTextEditable := True,
+                    cellTextEditableSet := True,
+                    cellTextBackgroundColor := paleYellow,
+                    cellTextBackgroundSet := True
+                    ]
+
+
     cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := pack (show (afChannel hs))]
     cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := afPath hs ]
-    cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := pack (show (afFileChannel hs)) ]
+    cellLayoutSetAttributes col3 renderer3 ls $ \hs -> [ cellText := pack (show (afFileChannel hs)) ]
 
     _ <- treeViewAppendColumn tv col1
     _ <- treeViewAppendColumn tv col2
+    _ <- treeViewAppendColumn tv col3
 
     treeViewSetEnableSearch tv True
     treeViewSetSearchEqualFunc tv $ Just $ \str iter -> do
@@ -252,20 +286,21 @@ initTreeViewSamples tv ls = do
         row <- listStoreGetValue ls i
         return $ toLower str `T.isPrefixOf` toLower (pack (afPath row))
 
-
-
-    return ()
+    return (renderer1, renderer3)
 
 
 
-setNotebookCurrentPageLabel :: InstrumentPage -> Text -> IO ()
-setNotebookCurrentPageLabel instPage name = do
+setCurrentNotebookLabel :: InstrumentPage -> Text -> IO ()
+setCurrentNotebookLabel instPage name = do
     let notebook = guiNotebookInstruments (guiMainWindow instPage)
     currentPage <- notebookGetCurrentPage notebook
     page <- notebookGetNthPage notebook currentPage
     case page of
         Just p -> notebookSetTabLabelText notebook p name
         Nothing -> return ()
+
+
+
 
 
 
@@ -283,6 +318,7 @@ setInstrumentFile instPage instrumentFile = do
     let model = guiInstHitViewModel instPage
 
     setListStoreTo model (ifSamples instrumentFile)
+    listStoreClear (guiInstSamplesViewModel instPage)
 
     return ()
 
@@ -290,7 +326,7 @@ setInstrumentFile instPage instrumentFile = do
 setListStoreTo :: ListStore a -> [a] -> IO ()
 setListStoreTo ls xs = do
     listStoreClear ls
-    mapM_ (listStoreAppend ls) xs
+    P.mapM_ (listStoreAppend ls) xs
 
 
 setupCallbacks :: InstrumentPage -> IO ()
@@ -305,8 +341,12 @@ setupCallbacks instPage = do
         return ()
 
     void $ on (guiInstSamplesView instPage) buttonPressEvent $ do
-        liftIO $ menuPopup (guiAudioSamplesMenu instPage) Nothing
-        return True
+        bt <- eventButton
+        case bt of
+            RightButton -> do
+                liftIO $ menuPopup (guiAudioSamplesMenu instPage) Nothing
+                return True
+            _ -> return False
 
 
     void $ on (guiRendererHP instPage) edited $ \[i] str -> do
@@ -318,7 +358,51 @@ setupCallbacks instPage = do
                 -- set the GTK list store to the new value
                 listStoreSetValue (guiInstHitViewModel instPage) i (val {hsPower = x})
 
+    void $ on (guiRendererChan instPage) edited $ \[i] str -> do
+        val <- listStoreGetValue (guiInstSamplesViewModel instPage) i
+        let res = validateMic str
+        case res of
+            Left err -> displayErrorBox (guiMainWindow instPage) err
+            Right x -> do
+                -- set the GTK list store to the new value
+                let val' = val {afChannel = x}
+                listStoreSetValue (guiInstSamplesViewModel instPage) i val'
+                -- we also need to set the new value in the HitSample itself
+
+                sel <- treeViewGetSelection (guiInstHitView instPage)
+                path <- treeSelectionGetSelectedRows sel
+                let idx = P.head (P.head path)
+                hsVal <- listStoreGetValue (guiInstHitViewModel instPage) idx
+                let samples = hsSamples hsVal
+                    samples' = fmap upd samples
+                    upd s = if s == val then val' else s
+                    hsVal' = hsVal {hsSamples = samples'}
+                listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
+
+    void $ on (guiRendererFileChan instPage) edited $ \[i] str -> do
+        val <- listStoreGetValue (guiInstSamplesViewModel instPage) i
+        let res = validate str
+        case res of
+            Left err -> displayErrorBox (guiMainWindow instPage) err
+            Right x -> do
+                -- set the GTK list store to the new value
+                let val' = val {afFileChannel = x}
+                listStoreSetValue (guiInstSamplesViewModel instPage) i val'
+                -- we also need to set the new value in the HitSample itself
+
+                sel <- treeViewGetSelection (guiInstHitView instPage)
+                path <- treeSelectionGetSelectedRows sel
+                let idx = P.head (P.head path)
+                hsVal <- listStoreGetValue (guiInstHitViewModel instPage) idx
+                let samples = hsSamples hsVal
+                    samples' = fmap upd samples
+                    upd s = if s == val then val' else s
+                    hsVal' = hsVal {hsSamples = samples'}
+                listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
+
     return ()
+
+
 
 
 addSamples :: TreeView -> ListStore AudioFile -> IO ()
@@ -329,44 +413,91 @@ removeSamples :: TreeView -> ListStore AudioFile -> IO ()
 removeSamples _ _ = return ()
 
 
+getInstrumentFromGUI :: InstrumentPage -> IO (Either Text InstrumentFile)
+getInstrumentFromGUI instPage = do
+    name <- entryGetText (guiEntryName instPage)
+    t <- entryGetText (guiEntryType instPage)
+    samples <- listStoreToList (guiInstHitViewModel instPage)
+    let version = dgDefaultVersion
+        t' = validate t
+
+    case t' of
+        Left err  -> return $ Left err
+        Right typ -> do
+            let res = InstrumentFile version name typ samples
+            return (Right res)
+
+
+storeInstrument :: InstrumentPage -> InstrumentFile -> IO ()
+storeInstrument instPage instFile = do
+    writeIORef (guiInstFile instPage) (Just instFile)
+
 
 
 exportInstrument :: InstrumentPage -> IO ()
 exportInstrument instPage = do
-    -- get all values from the GUI and update the InsturmentFile
-    name <- entryGetText (guiEntryName instPage)
-    typS <- entryGetText (guiEntryType instPage)
+    i <- getInstrumentFromGUI instPage
+    case i of
+        Left err -> displayErrorBox (guiMainWindow instPage) err
+        Right instrumentFile -> do
+            storeInstrument instPage instrumentFile
 
-    hitSamples <- listStoreToList (guiInstHitViewModel instPage)
+            basepath <- entryGetText (guiBaseDir (guiMainWindow instPage))
 
-    ifl <- readIORef (guiInstFile instPage)
+            let
+                dgInstrumentsPath = getInstrumentDir basepath
+                content = convertToInstrumentXML instrumentFile
+                filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
+            B.writeFile filename content
+            displayInfoBox (guiMainWindow instPage) ("Successfully exported instrument (" `append` pack filename `append` ")")
 
-    let
-        errorMsg err = "Error: " `append` (pack (show err))
 
-    catch
-        (do
-            typ <- evaluate ((read (unpack typS)) :: Instrument)
-            case ifl of
-                Nothing -> do
-                    let !ifl' = InstrumentFile iflDefaultVersion name typ hitSamples
-                    writeIORef (guiInstFile instPage) (Just ifl')
-                Just x -> do
-                    let ifl' = x { ifName = name, ifType = typ, ifSamples = hitSamples}
-                    writeIORef (guiInstFile instPage) (Just ifl')
+validateName :: InstrumentPage -> IO ()
+validateName instPage = do
+    nm <- entryGetText (guiEntryName instPage)
+    let nm' = T.filter (not . isSpace) nm
+    entrySetText (guiEntryName instPage) nm'
+    setCurrentNotebookLabel instPage nm'
 
-                    -- convert into XML format
-                    basedir <- entryGetText (guiBaseDir (guiMainWindow instPage))
-                    let instFileName = (getInstrumentDir basedir) </> (unpack name) <.> "xml"
-                        cont = convertToInstrumentXML ifl'
 
-                    -- write content to file
-                    B.writeFile instFileName cont
 
-                    -- notify user
-                    displayInfoBox (guiMainWindow instPage) ("File '" `append` (pack instFileName) `append` "' exported successfully.")
+validate :: Read a => Text -> (Either Text a)
+validate input = do
+    let maybeRead = (fmap fst . listToMaybe . reads) (unpack input)
+    case maybeRead of
+        Just x -> Right x
+        Nothing -> Left ("Illegal input: " `append` input)
 
-                    return ()
-        )
-        (\e -> do
-                displayErrorBox (guiMainWindow instPage) (errorMsg (e :: SomeException)))
+
+validateType :: InstrumentPage -> IO ()
+validateType instPage = do
+    t <- entryGetText (guiEntryType instPage)
+    let r = validate t
+    case r of
+        Left err -> displayErrorBox (guiMainWindow instPage) err
+        Right x -> do
+            iF <- readIORef (guiInstFile instPage)
+            case iF of
+                Nothing -> return ()
+                Just instF -> do
+                    let !iF' = instF {ifType = x}
+                    writeIORef (guiInstFile instPage) (Just iF')
+
+
+
+insertInstrumentPage :: MainWindow InstrumentPage -> InstrumentPage -> IO ()
+insertInstrumentPage gui instPage = do
+    v <- readIORef (guiInstrumentPages gui)
+    let !v' = v V.++ V.singleton instPage
+    writeIORef (guiInstrumentPages gui) v'
+
+
+
+setNotebookCurrentPageLabel :: InstrumentPage -> Text -> IO ()
+setNotebookCurrentPageLabel instPage name = do
+    let notebook = guiNotebookInstruments (guiMainWindow instPage)
+    currentPage <- notebookGetCurrentPage notebook
+    page <- notebookGetNthPage notebook currentPage
+    case page of
+        Just p -> notebookSetTabLabelText notebook p name
+        Nothing -> return ()

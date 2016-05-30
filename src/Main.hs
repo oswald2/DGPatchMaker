@@ -11,6 +11,6 @@ main :: IO ()
 main = do
     gui <- initMainWindow
 
-    gtkInterfaceMainLoop
+    gtkInterfaceMainLoop gui
 
     return ()

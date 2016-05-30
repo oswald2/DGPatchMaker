@@ -8,8 +8,8 @@
     <property name="stock">gtk-missing-image</property>
   </object>
   <object class="GtkWindow" id="mainWindow">
-    <property name="width_request">800</property>
-    <property name="height_request">600</property>
+    <property name="width_request">1280</property>
+    <property name="height_request">720</property>
     <property name="can_focus">False</property>
     <child>
       <object class="GtkBox" id="box1">
@@ -130,11 +130,12 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <child>
-                      <object class="GtkButton" id="button1">
-                        <property name="label" translatable="yes">Load Drumkit</property>
+                      <object class="GtkButton" id="buttonImportDrumkit">
+                        <property name="label" translatable="yes">Import DrumDrops Drumkit</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="receives_default">True</property>
+                        <property name="yalign">0.4699999988079071</property>
                       </object>
                       <packing>
                         <property name="expand">False</property>
@@ -143,8 +144,8 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkButton" id="button2">
-                        <property name="label" translatable="yes">Save Drumkit</property>
+                      <object class="GtkButton" id="buttonExportDrumkit">
+                        <property name="label" translatable="yes">Export Drumkit</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="receives_default">True</property>
@@ -163,9 +164,40 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkBox" id="box8">
+                  <object class="GtkGrid" id="grid1">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
+                    <child>
+                      <object class="GtkButton" id="buttonSetBaseDir">
+                        <property name="label" translatable="yes">Set Base Directory...</property>
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">True</property>
+                        <property name="tooltip_text" translatable="yes">Set to the Directory where the DRUMGIZMO patch directory should be created. Must be set first.</property>
+                        <property name="relief">half</property>
+                        <property name="xalign">0.4699999988079071</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">2</property>
+                        <property name="top_attach">0</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkEntry" id="entryBaseDirectory">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="tooltip_text" translatable="yes">Set to the Directory where the DRUMGIZMO patch directory should be created. Must be set first.</property>
+                        <property name="width_chars">100</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">1</property>
+                        <property name="top_attach">0</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
+                      </packing>
+                    </child>
                     <child>
                       <object class="GtkLabel" id="label5">
                         <property name="visible">True</property>
@@ -175,33 +207,54 @@
                         <property name="ellipsize">end</property>
                       </object>
                       <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">True</property>
-                        <property name="position">0</property>
+                        <property name="left_attach">0</property>
+                        <property name="top_attach">0</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkEntry" id="entryBaseDirectory">
+                      <object class="GtkLabel" id="label8">
                         <property name="visible">True</property>
-                        <property name="can_focus">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="xpad">5</property>
+                        <property name="label" translatable="yes">Samples Directory:</property>
+                        <property name="ellipsize">end</property>
                       </object>
                       <packing>
-                        <property name="expand">True</property>
-                        <property name="fill">True</property>
-                        <property name="position">1</property>
+                        <property name="left_attach">0</property>
+                        <property name="top_attach">1</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkButton" id="buttonSetBaseDir">
-                        <property name="label" translatable="yes">Set Base Directory...</property>
+                      <object class="GtkEntry" id="entrySamplesDirectory">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="tooltip_text" translatable="yes">Set the base directory where the samples can be found. The samples can be organized in subfolders, so this must be set to the base directory, where all sample directories can be found.</property>
+                        <property name="width_chars">100</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">1</property>
+                        <property name="top_attach">1</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="buttonSetSamplesDir">
+                        <property name="label" translatable="yes">Set Samples Directory...</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="receives_default">True</property>
+                        <property name="tooltip_text" translatable="yes">Set the base directory where the samples can be found. The samples can be organized in subfolders, so this must be set to the base directory, where all sample directories can be found.</property>
                       </object>
                       <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">True</property>
-                        <property name="position">2</property>
+                        <property name="left_attach">2</property>
+                        <property name="top_attach">1</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
                       </packing>
                     </child>
                   </object>
@@ -461,15 +514,10 @@
           </packing>
         </child>
         <child>
-          <object class="GtkStatusbar" id="statusbar1">
+          <object class="GtkProgressBar" id="progressbar">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
-            <property name="margin_left">10</property>
-            <property name="margin_right">10</property>
-            <property name="margin_top">6</property>
-            <property name="margin_bottom">6</property>
-            <property name="orientation">vertical</property>
-            <property name="spacing">2</property>
+            <property name="show_text">True</property>
           </object>
           <packing>
             <property name="expand">False</property>

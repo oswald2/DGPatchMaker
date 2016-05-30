@@ -19,6 +19,8 @@ import Control.Monad (void)
 import Data.Text as T
 import Data.Types
 import Data.Maybe (isJust)
+import Data.Drumgizmo
+import Data.List (sort)
 
 import Text.Parsec as P
 --import Text.Parsec.Char
@@ -72,7 +74,7 @@ data VelocityGroup = VelocityGroup {
 
 convertSampleGroup :: FilePath -> SampleGroup -> InstrumentFile
 convertSampleGroup basepath sg =
-    InstrumentFile iflDefaultVersion nm (sgInstrument sg) groups
+    InstrumentFile dgDefaultVersion nm (sgInstrument sg) groups
     where
         nm = sgInstName sg
         vname :: Int -> Text
@@ -90,7 +92,7 @@ convertVelocityGroup :: Text -> FilePath -> FilePath -> VelocityGroup -> HitSamp
 convertVelocityGroup name path basepath vg =
     HitSample name (vgVelocity vg) files
     where
-        files = Prelude.concatMap (convertSample basepath path) (vgSamples vg)
+        files = sort (Prelude.concatMap (convertSample basepath path) (vgSamples vg))
 
 
 
@@ -120,6 +122,63 @@ determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS R
     RoomL
 determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room)}) RightA =
     RoomR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Close)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Close)}) LeftA =
+    SnareL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Close)}) RightA =
+    SnareR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Close)}) Mono =
+    HiHatC
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Close)}) LeftA =
+    HiHatL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Close)}) RightA =
+    HiHatR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS Close)}) Mono =
+    TomC x
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS Close)}) LeftA =
+    TomL x
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS Close)}) RightA =
+    TomR x
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS Close)}) Mono =
+    FloorTomC x
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS Close)}) LeftA =
+    FloorTomL x
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS Close)}) RightA =
+    FloorTomR x
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+
 determineChannel _ _ = Undefined
 
 
