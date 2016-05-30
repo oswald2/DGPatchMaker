@@ -7,8 +7,9 @@ module Gtk.InstrumentFrame
     )
 where
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Monad.IO.Class (liftIO)
+import Control.Exception
 
 import Prelude as P
 
@@ -18,15 +19,20 @@ import Graphics.UI.Gtk
 import Data.Text as T
 --import qualified Data.Text.Lazy as TL
 --import Data.Text.Format
+import qualified Data.ByteString.Lazy as B
 
 import Data.Types
 import Data.IORef
 import Data.Checkers
-
+import Data.Drumgizmo
+import Data.Export
+import Data.Char (isSpace)
 
 import Data.DrumDrops.Utils
 
 import Gtk.MainWindow
+
+import System.FilePath
 
 
 data InstrumentPage = InstrumentPage {
@@ -64,6 +70,8 @@ newInstrumentPage parentWindow = do
     buttonImportInstrument <- builderGetObject builder castToButton ("buttonImportInstrument" :: Text)
     buttonExportInstrument <- builderGetObject builder castToButton ("buttonExportInstrument" :: Text)
 
+    widgetSetSensitive buttonOpenSamples False
+
     entryVersion <- builderGetObject builder castToEntry ("entryVersion" :: Text)
     entryName <- builderGetObject builder castToEntry ("entryName" :: Text)
     entryType <- builderGetObject builder castToEntry ("entryType" :: Text)
@@ -97,17 +105,28 @@ newInstrumentPage parentWindow = do
 
         }
 
+    -- set the default values for this instrument page
+    entrySetText entryVersion iflDefaultVersion
+
     -- setup the callback for the import button
     void $ on buttonImportInstrument buttonActivated (importDrumDropsInstrument parentWindow gui)
+    void $ on buttonExportInstrument buttonActivated (exportInstrument gui)
 
     void $ on menuAddSamples menuItemActivate (addSamples treeviewSamples sals)
     void $ on menuRemoveSample menuItemActivate (removeSamples treeviewSamples sals)
 
+    void $ on entryName entryActivated $ do
+        txt' <- entryGetText entryName
+        let txt = T.filter (not.isSpace) txt
+        when (txt /= txt') $ entrySetText entryName txt
+        setNotebookCurrentPageLabel gui txt'
 
     -- setup the local callbacks for the treeviews
     setupCallbacks gui
 
     return gui
+
+
 
 
 importDrumDropsInstrument :: MainWindow -> InstrumentPage -> IO ()
@@ -238,17 +257,24 @@ initTreeViewSamples tv ls = do
     return ()
 
 
+
+setNotebookCurrentPageLabel :: InstrumentPage -> Text -> IO ()
+setNotebookCurrentPageLabel instPage name = do
+    let notebook = guiNotebookInstruments (guiMainWindow instPage)
+    currentPage <- notebookGetCurrentPage notebook
+    page <- notebookGetNthPage notebook currentPage
+    case page of
+        Just p -> notebookSetTabLabelText notebook p name
+        Nothing -> return ()
+
+
+
 setInstrumentFile :: InstrumentPage -> InstrumentFile -> IO ()
 setInstrumentFile instPage instrumentFile = do
     let ref = guiInstFile instPage
     writeIORef ref (Just instrumentFile)
 
-    let notebook = guiNotebookInstruments (guiMainWindow instPage)
-    currentPage <- notebookGetCurrentPage notebook
-    page <- notebookGetNthPage notebook currentPage
-    case page of
-        Just p -> notebookSetTabLabelText notebook p (ifName instrumentFile)
-        Nothing -> return ()
+    setNotebookCurrentPageLabel instPage (ifName instrumentFile)
 
     entrySetText (guiEntryVersion instPage) (ifVersion instrumentFile)
     entrySetText (guiEntryName instPage) (ifName instrumentFile)
@@ -301,3 +327,46 @@ addSamples _ _ = return ()
 
 removeSamples :: TreeView -> ListStore AudioFile -> IO ()
 removeSamples _ _ = return ()
+
+
+
+
+exportInstrument :: InstrumentPage -> IO ()
+exportInstrument instPage = do
+    -- get all values from the GUI and update the InsturmentFile
+    name <- entryGetText (guiEntryName instPage)
+    typS <- entryGetText (guiEntryType instPage)
+
+    hitSamples <- listStoreToList (guiInstHitViewModel instPage)
+
+    ifl <- readIORef (guiInstFile instPage)
+
+    let
+        errorMsg err = "Error: " `append` (pack (show err))
+
+    catch
+        (do
+            typ <- evaluate ((read (unpack typS)) :: Instrument)
+            case ifl of
+                Nothing -> do
+                    let !ifl' = InstrumentFile iflDefaultVersion name typ hitSamples
+                    writeIORef (guiInstFile instPage) (Just ifl')
+                Just x -> do
+                    let ifl' = x { ifName = name, ifType = typ, ifSamples = hitSamples}
+                    writeIORef (guiInstFile instPage) (Just ifl')
+
+                    -- convert into XML format
+                    basedir <- entryGetText (guiBaseDir (guiMainWindow instPage))
+                    let instFileName = (getInstrumentDir basedir) </> (unpack name) <.> "xml"
+                        cont = convertToInstrumentXML ifl'
+
+                    -- write content to file
+                    B.writeFile instFileName cont
+
+                    -- notify user
+                    displayInfoBox (guiMainWindow instPage) ("File '" `append` (pack instFileName) `append` "' exported successfully.")
+
+                    return ()
+        )
+        (\e -> do
+                displayErrorBox (guiMainWindow instPage) (errorMsg (e :: SomeException)))

@@ -72,7 +72,7 @@ data VelocityGroup = VelocityGroup {
 
 convertSampleGroup :: FilePath -> SampleGroup -> InstrumentFile
 convertSampleGroup basepath sg =
-    InstrumentFile "2.0" nm (sgInstrument sg) groups
+    InstrumentFile iflDefaultVersion nm (sgInstrument sg) groups
     where
         nm = sgInstName sg
         vname :: Int -> Text

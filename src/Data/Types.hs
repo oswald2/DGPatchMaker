@@ -34,10 +34,12 @@ data Instrument =
     | Tom TomType
     | Cymbal
     | Ride
-    deriving (Show, Eq)
+    deriving (Show, Read, Eq)
 
 instance Ord Instrument where
     compare x1 x2 = compare (toNumber x1) (toNumber x2)
+
+
 
 toNumber :: Instrument -> Int
 toNumber Kick = 1
@@ -52,7 +54,7 @@ toNumber Ride = 6
 data TomType =
     RackTom !Int
     | Floor !Int
-    deriving (Show, Eq)
+    deriving (Show, Read, Eq)
 
 data MicType =
     Close
@@ -95,6 +97,9 @@ data InstrumentFile = InstrumentFile {
     ifType :: !Instrument,
     ifSamples :: [HitSample]
 } deriving Show
+
+iflDefaultVersion :: Text
+iflDefaultVersion = "2.0"
 
 
 data HitSample = HitSample {
