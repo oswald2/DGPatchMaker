@@ -15,6 +15,8 @@ import Data.Vector as V
 import Gtk.MainWindow
 import Gtk.InstrumentFrame
 import Gtk.DrumDropsKitImport
+import Gtk.Drumkit
+
 
 
 initMainWindow :: IO (MainWindow InstrumentPage)
