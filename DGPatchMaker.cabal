@@ -70,6 +70,7 @@ executable DGPatchMaker
                        transformers,
                        containers,
                        filemanip,
+                       classy-prelude,
                        gtk3
 
   ghc-options: -O2 -Wall -rtsopts
