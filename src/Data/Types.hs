@@ -138,6 +138,7 @@ data Microphones =
     | FloorTomC Int
     | FloorTomL Int
     | FloorTomR Int
+    | RideC
     | OHL
     | OHR
     | RoomL
@@ -163,6 +164,7 @@ instance Show Microphones where
     show (FloorTomC x) =     "FloorTomC" ++ show x
     show (FloorTomL x) =     "FloorTomL" ++ show x
     show (FloorTomR x) =     "FloorTomR" ++ show x
+    show (RideC) =      "RideC"
     show OHL =          "OHL"
     show OHR =          "OHR"
     show RoomL =        "RoomL"
@@ -190,10 +192,11 @@ micToInt (TomR x) = 30 + x
 micToInt (FloorTomC x) = 40 + x
 micToInt (FloorTomL x) = 50 + x
 micToInt (FloorTomR x) = 60 + x
-micToInt OHL = 70
-micToInt OHR = 71
-micToInt RoomL = 72
-micToInt RoomR = 73
+micToInt RideC = 70
+micToInt OHL = 71
+micToInt OHR = 72
+micToInt RoomL = 73
+micToInt RoomR = 74
 micToInt Undefined = 100
 
 instance Eq Microphones where
@@ -236,6 +239,7 @@ micParser = do
         void $ try (string "FloorTomR")
         n <- many1 digit
         return (FloorTomR (read n))
+    <|> (try (string "RideC"        ) >> return RideC       )
     <|> (try (string "OHL"          ) >> return OHL         )
     <|> (try (string "OHR"          ) >> return OHR         )
     <|> (try (string "RoomL"        ) >> return RoomL       )

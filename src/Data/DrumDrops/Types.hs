@@ -178,7 +178,24 @@ determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties =
     OHL
 determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Overhead)}) RightA =
     OHR
-
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Close)}) Mono =
+    RideC
 determineChannel _ _ = Undefined
 
 
@@ -214,7 +231,7 @@ getSampleFromFileName name nChannels =
 
 sampleParser :: Text -> Word -> Parsec Text u Sample
 sampleParser fname nChannels = do
-    maker' <- many1 upper
+    maker' <- many1 alphaNum
     void $ char '_'
     inst <- instrument
     void $ char '_'
@@ -253,7 +270,7 @@ toms = do
             n <- digit
             return (RackTom (read [n]))
         <|> do
-            void $ char 'F'
+            void $ string "FL"
             return (Floor 1)
     void $ string "TM"
     return (Tom t)

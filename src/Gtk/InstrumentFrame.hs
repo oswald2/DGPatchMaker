@@ -4,7 +4,7 @@ module Gtk.InstrumentFrame
     InstrumentPage
     ,newInstrumentPage
     ,getMainBox
-    ,insertInstrumentPage
+    --,insertInstrumentPage
     ,setInstrumentFile
     )
 where
@@ -16,7 +16,10 @@ import Control.Monad.IO.Class (liftIO)
 import Prelude as P
 
 import Graphics.UI.Gtk
---import Graphics.UI.Gtk.Builder
+
+import Gtk.Colors
+import Gtk.Utils
+
 
 import Data.Text as T
 --import qualified Data.Text.Lazy as TL
@@ -30,20 +33,21 @@ import Data.Drumgizmo
 import Data.Export
 import Data.Maybe
 import Data.Char (isSpace)
-import Data.Vector as V
+--import Data.Vector as V
 
 import Data.DrumDrops.Utils
 
 import System.FilePath
-
-import Gtk.MainWindow
 
 --import System.FilePath
 
 
 data InstrumentPage = InstrumentPage {
     guiInstMainBox :: Box,
-    guiMainWindow :: MainWindow InstrumentPage,
+    guiMainWindow :: Window,
+    guiIPNotebook :: Notebook,
+    guiIPEntryBaseDir :: Entry,
+    guiIPEntrySamplesDir :: Entry,
     guiInstHitView :: TreeView,
     guiInstHitViewModel :: ListStore HitSample,
     guiRendererHP :: CellRendererText,
@@ -61,8 +65,8 @@ data InstrumentPage = InstrumentPage {
 
 
 
-newInstrumentPage :: MainWindow InstrumentPage -> IO InstrumentPage
-newInstrumentPage parentWindow = do
+newInstrumentPage :: Window -> Notebook -> Entry -> Entry -> IO InstrumentPage
+newInstrumentPage parentWindow notebook basedir samplesDir = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
@@ -99,6 +103,9 @@ newInstrumentPage parentWindow = do
     let gui = InstrumentPage {
         guiInstMainBox = mainBox,
         guiMainWindow = parentWindow,
+        guiIPNotebook = notebook,
+        guiIPEntryBaseDir = basedir,
+        guiIPEntrySamplesDir = samplesDir,
         guiInstHitView = treeviewHit,
         guiInstHitViewModel = hsls,
         guiInstSamplesView = treeviewSamples,
@@ -143,8 +150,7 @@ newInstrumentPage parentWindow = do
 
 importDrumDropsInstrument :: InstrumentPage -> IO ()
 importDrumDropsInstrument instPage = do
-    let mainWindow = guiMainWindow instPage
-        parentWindow = guiWindow mainWindow
+    let parentWindow = guiMainWindow instPage
 
     dialog <- fileChooserDialogNew
                 (Just $ ("Import DrumDrops Instrument from Path" :: Text))             --dialog title
@@ -155,8 +161,9 @@ importDrumDropsInstrument instPage = do
                  ,("gtk-open"
                  , ResponseAccept)]
 
-    basedir <- entryGetText (guiBaseDir mainWindow)
-    sampleDir <- entryGetText (guiSamplesDir mainWindow)
+    basedir <- entryGetText (guiIPEntryBaseDir instPage)
+    sampleDir <- entryGetText (guiIPEntrySamplesDir instPage)
+
     case basedir of
         "" -> do
             dial <- messageDialogNew (Just parentWindow) [DialogDestroyWithParent] MessageError ButtonsClose ("Base Directory not set!" :: Text)
@@ -292,7 +299,7 @@ initTreeViewSamples tv ls = do
 
 setCurrentNotebookLabel :: InstrumentPage -> Text -> IO ()
 setCurrentNotebookLabel instPage name = do
-    let notebook = guiNotebookInstruments (guiMainWindow instPage)
+    let notebook = guiIPNotebook instPage
     currentPage <- notebookGetCurrentPage notebook
     page <- notebookGetNthPage notebook currentPage
     case page of
@@ -442,7 +449,7 @@ exportInstrument instPage = do
         Right instrumentFile -> do
             storeInstrument instPage instrumentFile
 
-            basepath <- entryGetText (guiBaseDir (guiMainWindow instPage))
+            basepath <- entryGetText (guiIPEntryBaseDir instPage)
 
             let
                 dgInstrumentsPath = getInstrumentDir basepath
@@ -485,19 +492,26 @@ validateType instPage = do
 
 
 
-insertInstrumentPage :: MainWindow InstrumentPage -> InstrumentPage -> IO ()
-insertInstrumentPage gui instPage = do
-    v <- readIORef (guiInstrumentPages gui)
-    let !v' = v V.++ V.singleton instPage
-    writeIORef (guiInstrumentPages gui) v'
+--insertInstrumentPage :: InstrumentPage -> IO ()
+--insertInstrumentPage instPage = do
+    --let ioref = guiIPInstrumentPages instPage
+    --v <- readIORef ioref
+    --let !v' = v V.++ V.singleton instPage
+    --writeIORef ioref v'
 
 
 
 setNotebookCurrentPageLabel :: InstrumentPage -> Text -> IO ()
 setNotebookCurrentPageLabel instPage name = do
-    let notebook = guiNotebookInstruments (guiMainWindow instPage)
+    let notebook = guiIPNotebook instPage
     currentPage <- notebookGetCurrentPage notebook
     page <- notebookGetNthPage notebook currentPage
     case page of
         Just p -> notebookSetTabLabelText notebook p name
         Nothing -> return ()
+
+
+
+
+
+

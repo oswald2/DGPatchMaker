@@ -23,6 +23,9 @@ import Sound.File.Sndfile (getFileInfo, Info(..))
 
 importInstrument :: FilePath -> FilePath -> FilePath -> IO (Either Text InstrumentFile)
 importInstrument basepath samplesPath path = do
+
+    putStrLn $ "Importing Instrument from: " ++ path
+
     w <- getSamples samplesPath path
     case w of
         Left err -> return (Left err)
@@ -87,3 +90,7 @@ pathToInstrument sampleDir path' =
         inst = P.filter (not . isSpace) ps
     in
     pack inst
+
+
+
+
