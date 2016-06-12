@@ -8,6 +8,7 @@ import Data.Text
 import Data.Set as S
 import System.FilePath
 import Text.Parsec as P
+import Data.List (sortOn)
 
 
 data Drumkit = Drumkit {
@@ -21,6 +22,7 @@ data ChannelMap = ChannelMap {
     cmName :: !Text,
     cmGroup :: Maybe Text,
     cmFile :: !FilePath,
+    cmType :: !Instrument,
     cmMap :: [(Text, Text)]
 } deriving (Show)
 
@@ -266,7 +268,7 @@ generateDrumkit name description ifl = res
 
 instrumentFileToChannelMap :: InstrumentFile -> ChannelMap
 instrumentFileToChannelMap ifl =
-    ChannelMap (ifName ifl) grp filePath chans
+    ChannelMap (ifName ifl) grp filePath (ifType ifl) chans
     where
         filePath = "Instruments" </> unpack (ifName ifl) <.> "xml"
         grp | ifType ifl == HiHat = Just "hihat"
@@ -290,3 +292,22 @@ getAvailableChannels ifl = Prelude.foldr getAvailableChannelsIF S.empty ifl
 
 getInstrumentNames :: Drumkit -> [Text]
 getInstrumentNames dk = Prelude.map cmName $ dkInstruments dk
+
+
+
+getMidiMap :: Drumkit -> MidiMap
+getMidiMap dk = MidiMap (sortOn fst (Prelude.map f (dkInstruments dk)))
+    where
+        f inst = (getMidiNoteFromInstrument (cmType inst), cmName inst)
+
+
+
+getMidiNoteFromInstrument :: Instrument -> Int
+getMidiNoteFromInstrument Kick = 35
+getMidiNoteFromInstrument Snare = 38
+getMidiNoteFromInstrument HiHat = 42
+getMidiNoteFromInstrument (Tom (Floor _)) = 43
+getMidiNoteFromInstrument (Tom (RackTom _)) = 45
+getMidiNoteFromInstrument Cymbal = 55
+getMidiNoteFromInstrument Ride = 51
+

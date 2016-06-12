@@ -17,7 +17,6 @@ import Gtk.InstrumentFrame
 import Gtk.Drumkit
 
 
-
 initMainWindow :: IO MainWindow
 initMainWindow = do
     void initGUI
@@ -43,10 +42,6 @@ initMainWindow = do
     progress <- builderGetObject builder castToProgressBar ("progressbar" :: Text)
 
     instPages <- newIORef (V.empty)
-
-    --inst <- newInstrumentPage window notebookInstruments entryBaseDirectory entrySamplesDir instPages
-    --void $ notebookAppendPage notebookInstruments (getMainBox inst) ("Instrument 1" :: Text)
-
 
     -- initialise the drumkit page
     drumkitPage <- initDrumkitPage window builder notebookInstruments progress entryBaseDirectory entrySamplesDir instPages

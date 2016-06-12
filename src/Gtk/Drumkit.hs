@@ -32,6 +32,7 @@ import Graphics.UI.Gtk as G
 import Gtk.Utils
 import Gtk.InstrumentFrame
 import Gtk.ErrorDialog
+import Gtk.MidiMap
 
 
 
@@ -54,7 +55,9 @@ data DrumkitPage = DrumkitPage {
     guiTvChannelMapModel :: ListStore (Text, Text),
     guiDrumkit :: IORef (Maybe Drumkit),
     guiDkInstrumentPages :: IORef (Vector InstrumentPage),
-    guiErrDiag :: ErrorDialog
+    guiErrDiag :: ErrorDialog,
+    guiMidiMapGM :: MidiMapPage,
+    guiMidiMapDef :: MidiMapPage
 }
 
 
@@ -80,6 +83,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
     eName <- builderGetObject builder castToEntry ("entryDkName" :: Text)
     eDesc <- builderGetObject builder castToTextView ("textviewDkDescription" :: Text)
 
+    tvMidiGM <- builderGetObject builder castToTreeView ("treeviewMidiMapGM" :: Text)
+    tvMidiDef <- builderGetObject builder castToTreeView ("treeviewMidiMapDef" :: Text)
+
     lsm <- listStoreNew []
     lsinst <- listStoreNew []
     lscm <- listStoreNew []
@@ -97,6 +103,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
 
     entrySetText eName ("MapexHeavyRockAllSamples" :: Text)
 
+    midiMapGm <- initMidiMap mainWindow tvMidiGM
+    midiMapDef <- initMidiMap mainWindow tvMidiDef
 
     let gui = DrumkitPage{
             guiDkParentWindow = mainWindow,
@@ -117,7 +125,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
             guiDkInstrumentsNotebook = instrumentsNotebook,
             guiDkProgress = progress,
             guiErrDiag = errDiag,
-            guiDkInstrumentPages = ioref
+            guiDkInstrumentPages = ioref,
+            guiMidiMapGM = midiMapGm,
+            guiMidiMapDef = midiMapDef
         }
 
     setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
@@ -256,6 +266,12 @@ importDrumDropsDrumKit' gui = do
                     setChannels gui (dkChannels drumkit)
                     setInstruments gui (dkInstruments drumkit)
 
+                    -- also convert the drumkit to a midi map
+                    let midimap = getMidiMap drumkit
+
+                    setMidiMap (guiMidiMapGM gui) midimap
+                    setMidiMap (guiMidiMapDef gui) midimap
+
                     return ()
             return ()
     where
@@ -268,14 +284,14 @@ importDrumDropsDrumKit' gui = do
                 step = 1.0 / fromIntegral n
             progressBarSetText progress ("Importing DrumDrops Drumkit..." :: Text)
 
-            instruments <- forM paths (doSingleImport progress basedir samplesDir step 0.0)
+            instruments <- forM paths (doSingleImport progress basedir samplesDir step)
 
             progressBarSetText progress ("" :: Text)
             progressBarSetFraction progress 0.0
 
             return instruments
 
-        doSingleImport progress basedir samplesDir step fraction path = do
+        doSingleImport progress basedir samplesDir step path = do
             ins <- newInstrumentPage (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
                 (guiBaseDir gui) (guiSamplesDir gui) (guiDkInstrumentPages gui)
             let instName = pathToInstrument samplesDir path
@@ -291,9 +307,17 @@ importDrumDropsDrumKit' gui = do
                     setInstrumentFile ins instFile
 
                     -- update the progress bar
-                    progressBarSetFraction progress (fraction + step)
-                    return (Right instFile)
+                    frac <- progressBarGetFraction progress
+                    progressBarSetFraction progress (frac + step)
 
+                    yield
+
+                    return (Right instFile)
+        yield = do
+            i <- eventsPending
+            when (i > 0) $ do
+                void $ mainIteration
+                yield
 
 
 
@@ -453,7 +477,14 @@ exportDrumKit gui = do
             nm <- getDkName gui
             case null nm of
                 True -> displayErrorBox (guiDkParentWindow gui) "No drumkit name specified!"
-                False -> writeDrumKitFile gui nm basepath
+                False -> do
+                    writeDrumKitFile gui nm basepath
+                    -- get the midi map and write it
+                    gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
+                    defMidi <- getMidiMapFromGUI (guiMidiMapDef gui)
+
+                    writeMidiMapFile gui basepath "MIDIMap_GM.xml" gmMidi
+                    writeMidiMapFile gui basepath "MIDIMap_Default.xml" defMidi
 
 
 
@@ -502,3 +533,17 @@ exportInstruments gui = do
             displayMultiErrors (guiErrDiag gui) "Multiple Errors during export of Instrument Files:" errs
         else do
             displayInfoBox (guiDkParentWindow gui) "Successfully exported drumkit."
+
+
+writeMidiMapFile :: DrumkitPage -> FilePath -> Text -> MidiMap -> IO ()
+writeMidiMapFile gui basepath filename midimap = do
+    catch (writeMidiMapFile' gui basepath filename midimap)
+        (\e -> displayErrorBox (guiDkParentWindow gui) ("Error during MIDI map export: " <> pack (show (e :: SomeException))))
+
+writeMidiMapFile' :: DrumkitPage -> FilePath -> Text -> MidiMap -> IO ()
+writeMidiMapFile' _ basepath filename midimap = do
+    let content = convertToMidiMapXML midimap
+        path = getDrumgizmoDir basepath </> unpack filename
+
+    B.writeFile path content
+

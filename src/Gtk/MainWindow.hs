@@ -7,7 +7,6 @@ import Graphics.UI.Gtk
 import Data.IORef
 import Data.Vector
 import Gtk.Drumkit
-
 import Gtk.InstrumentFrame
 
 
