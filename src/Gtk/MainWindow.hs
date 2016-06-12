@@ -3,7 +3,7 @@ where
 
 
 import Graphics.UI.Gtk
-import Data.Text
+--import Data.Text
 import Data.IORef
 import Data.Vector
 import Gtk.Drumkit
@@ -15,7 +15,7 @@ data MainWindow = MainWindow {
     guiWindow :: Window,
     guiNotebook :: Notebook,
     guiNotebookInstruments :: Notebook,
-    --guiInstrumentPages :: IORef (Vector InstrumentFrame),
+    guiInstrumentPages :: IORef (Vector InstrumentPage),
     guiProgress :: ProgressBar,
     guiDrumkitPage :: DrumkitPage
 }

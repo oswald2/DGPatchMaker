@@ -28,3 +28,10 @@ clearNotebook :: Notebook -> IO ()
 clearNotebook nb = do
     n <- notebookGetNPages nb
     forM_ [0..n] (notebookRemovePage nb)
+
+
+setListStoreTo :: ListStore a -> [a] -> IO ()
+setListStoreTo ls xs = do
+    listStoreClear ls
+    mapM_ (listStoreAppend ls) xs
+

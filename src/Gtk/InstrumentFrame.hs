@@ -4,8 +4,9 @@ module Gtk.InstrumentFrame
     InstrumentPage
     ,newInstrumentPage
     ,getMainBox
-    --,insertInstrumentPage
+    ,insertInstrumentPage
     ,setInstrumentFile
+    ,writeInstrumentFile
     )
 where
 
@@ -22,6 +23,7 @@ import Gtk.Utils
 
 
 import Data.Text as T
+import Data.Text.IO as T
 --import qualified Data.Text.Lazy as TL
 --import Data.Text.Format
 import qualified Data.ByteString.Lazy as B
@@ -33,7 +35,7 @@ import Data.Drumgizmo
 import Data.Export
 import Data.Maybe
 import Data.Char (isSpace)
---import Data.Vector as V
+import Data.Vector as V
 
 import Data.DrumDrops.Utils
 
@@ -48,6 +50,7 @@ data InstrumentPage = InstrumentPage {
     guiIPNotebook :: Notebook,
     guiIPEntryBaseDir :: Entry,
     guiIPEntrySamplesDir :: Entry,
+    guiIPInstrumentPages :: IORef (Vector InstrumentPage),
     guiInstHitView :: TreeView,
     guiInstHitViewModel :: ListStore HitSample,
     guiRendererHP :: CellRendererText,
@@ -65,8 +68,8 @@ data InstrumentPage = InstrumentPage {
 
 
 
-newInstrumentPage :: Window -> Notebook -> Entry -> Entry -> IO InstrumentPage
-newInstrumentPage parentWindow notebook basedir samplesDir = do
+newInstrumentPage :: Window -> Notebook -> Entry -> Entry -> IORef (Vector InstrumentPage) -> IO InstrumentPage
+newInstrumentPage parentWindow notebook basedir samplesDir ioref = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
@@ -117,7 +120,8 @@ newInstrumentPage parentWindow notebook basedir samplesDir = do
         guiRendererHP = rendererHP,
         guiAudioSamplesMenu = popUp,
         guiRendererChan = rendChan,
-        guiRendererFileChan = rendFileChan
+        guiRendererFileChan = rendFileChan,
+        guiIPInstrumentPages = ioref
         }
 
     -- set the default values for this instrument page
@@ -330,11 +334,6 @@ setInstrumentFile instPage instrumentFile = do
     return ()
 
 
-setListStoreTo :: ListStore a -> [a] -> IO ()
-setListStoreTo ls xs = do
-    listStoreClear ls
-    P.mapM_ (listStoreAppend ls) xs
-
 
 setupCallbacks :: InstrumentPage -> IO ()
 setupCallbacks instPage = do
@@ -425,6 +424,9 @@ getInstrumentFromGUI instPage = do
     name <- entryGetText (guiEntryName instPage)
     t <- entryGetText (guiEntryType instPage)
     samples <- listStoreToList (guiInstHitViewModel instPage)
+
+    T.putStrLn $ name `append` " Type: " `append` t
+
     let version = dgDefaultVersion
         t' = validate t
 
@@ -443,9 +445,19 @@ storeInstrument instPage instFile = do
 
 exportInstrument :: InstrumentPage -> IO ()
 exportInstrument instPage = do
+    res <- writeInstrumentFile instPage
+    case res of
+        Left err -> displayErrorBox (guiMainWindow instPage) ("Error during export: " `append` err)
+        Right filename -> displayInfoBox (guiMainWindow instPage)
+            ("Successfully exported instrument (" `append` pack filename `append` ")")
+
+
+
+writeInstrumentFile :: InstrumentPage -> IO (Either Text FilePath)
+writeInstrumentFile instPage = do
     i <- getInstrumentFromGUI instPage
     case i of
-        Left err -> displayErrorBox (guiMainWindow instPage) err
+        Left err -> return $ Left err
         Right instrumentFile -> do
             storeInstrument instPage instrumentFile
 
@@ -456,7 +468,7 @@ exportInstrument instPage = do
                 content = convertToInstrumentXML instrumentFile
                 filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
             B.writeFile filename content
-            displayInfoBox (guiMainWindow instPage) ("Successfully exported instrument (" `append` pack filename `append` ")")
+            return $ Right filename
 
 
 validateName :: InstrumentPage -> IO ()
@@ -473,7 +485,7 @@ validate input = do
     let maybeRead = (fmap fst . listToMaybe . reads) (unpack input)
     case maybeRead of
         Just x -> Right x
-        Nothing -> Left ("Illegal input: " `append` input)
+        Nothing -> Left ("Illegal input: '" `append` input `append` "'")
 
 
 validateType :: InstrumentPage -> IO ()
@@ -492,13 +504,11 @@ validateType instPage = do
 
 
 
---insertInstrumentPage :: InstrumentPage -> IO ()
---insertInstrumentPage instPage = do
-    --let ioref = guiIPInstrumentPages instPage
-    --v <- readIORef ioref
-    --let !v' = v V.++ V.singleton instPage
-    --writeIORef ioref v'
-
+insertInstrumentPage :: InstrumentPage -> IO ()
+insertInstrumentPage instPage = do
+    let ioref = guiIPInstrumentPages instPage
+    modifyIORef' ioref (\v -> v V.++ V.singleton instPage)
+    return ()
 
 
 setNotebookCurrentPageLabel :: InstrumentPage -> Text -> IO ()

@@ -9,8 +9,8 @@ import Control.Monad.IO.Class (liftIO)
 import Graphics.UI.Gtk
 
 import Data.Text as T
---import Data.IORef
---import Data.Vector as V
+import Data.IORef
+import Data.Vector as V
 
 import Gtk.MainWindow
 import Gtk.InstrumentFrame
@@ -36,43 +36,36 @@ initMainWindow = do
     itemQuit <- builderGetObject builder castToMenuItem ("menuitemQuit" :: Text)
     notebookInstruments <- builderGetObject builder castToNotebook ("notebookInstruments" :: Text)
 
-    --buttonImportDrumkit <- builderGetObject builder castToButton ("buttonImportDrumkit" :: Text)
     buttonNewInstrument <- builderGetObject builder castToButton ("buttonNewInstrument" :: Text)
-    --buttonSetBaseDir <- builderGetObject builder castToButton ("buttonSetBaseDir" :: Text)
-    --buttonSetSamplesDir <- builderGetObject builder castToButton ("buttonSetSamplesDir" :: Text)
     entryBaseDirectory <- builderGetObject builder castToEntry ("entryBaseDirectory" :: Text)
     entrySamplesDir <- builderGetObject builder castToEntry ("entrySamplesDirectory" :: Text)
 
-    entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples" :: FilePath)
-    entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples/Kontakt Pack Samples" :: FilePath)
-
     progress <- builderGetObject builder castToProgressBar ("progressbar" :: Text)
 
-    inst <- newInstrumentPage window notebookInstruments entryBaseDirectory entrySamplesDir
-    void $ notebookAppendPage notebookInstruments (getMainBox inst) ("Instrument 1" :: Text)
-    --insertInstrumentPage gui inst
+    instPages <- newIORef (V.empty)
 
-    --instPages <- newIORef (V.empty)
+    --inst <- newInstrumentPage window notebookInstruments entryBaseDirectory entrySamplesDir instPages
+    --void $ notebookAppendPage notebookInstruments (getMainBox inst) ("Instrument 1" :: Text)
+
 
     -- initialise the drumkit page
-    drumkitPage <- initDrumkitPage window builder notebookInstruments progress entryBaseDirectory entrySamplesDir
+    drumkitPage <- initDrumkitPage window builder notebookInstruments progress entryBaseDirectory entrySamplesDir instPages
 
     let gui = MainWindow {
         guiWindow = window,
         guiNotebook = notebook,
         guiNotebookInstruments = notebookInstruments,
-        --guiInstrumentPages = instPages,
+        guiInstrumentPages = instPages,
         guiProgress = progress,
         guiDrumkitPage = drumkitPage
         }
 
-
-
+    --insertInstrumentPage inst
 
     void $ on buttonNewInstrument buttonActivated $ do
-        ins <- newInstrumentPage window notebookInstruments entryBaseDirectory entrySamplesDir
+        ins <- newInstrumentPage window notebookInstruments entryBaseDirectory entrySamplesDir instPages
         i <- notebookAppendPage notebookInstruments (getMainBox ins) ("Instrument 1" :: Text)
-        --insertInstrumentPage gui ins
+        insertInstrumentPage ins
         notebookSetCurrentPage notebookInstruments i
 
     -- set termination
