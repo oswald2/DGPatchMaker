@@ -42,7 +42,8 @@ import Data.DrumDrops.Utils
 
 import System.FilePath
 
---import System.FilePath
+import Gtk.InstrumentPageBuilder
+
 
 
 data InstrumentPage = InstrumentPage {
@@ -74,8 +75,8 @@ newInstrumentPage parentWindow notebook basedir samplesDir ioref = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
-    builderAddFromFile builder "InstrumentPage.glade"
-    --builderAddFromString builder builderFileAsString
+    --builderAddFromFile builder "InstrumentPage.glade"
+    builderAddFromString builder builderFileAsString
 
     -- Retrieve some objects from the UI
     mainBox <- builderGetObject builder castToBox ("mainBox" :: Text)

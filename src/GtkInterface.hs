@@ -16,6 +16,10 @@ import Gtk.MainWindow
 import Gtk.InstrumentFrame
 import Gtk.Drumkit
 
+import Gtk.DGPatchMakerBuilder
+
+
+
 
 initMainWindow :: IO MainWindow
 initMainWindow = do
@@ -23,8 +27,8 @@ initMainWindow = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
-    builderAddFromFile builder "DGPatchMaker.glade"
-    --builderAddFromString builder builderFileAsString
+    --builderAddFromFile builder "DGPatchMaker.glade"
+    builderAddFromString builder builderFileAsString
 
     -- Retrieve some objects from the UI
     window <- builderGetObject builder castToWindow ("mainWindow" :: Text)
