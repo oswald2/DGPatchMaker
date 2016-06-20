@@ -71,6 +71,10 @@ executable DGPatchMaker
                        containers,
                        filemanip,
                        classy-prelude,
+                       resourcet,
+                       conduit,
+                       xml-conduit,
+                       xml-types,
                        gtk3
 
   ghc-options: -O2 -Wall -rtsopts

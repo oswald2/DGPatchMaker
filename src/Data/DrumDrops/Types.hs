@@ -196,6 +196,35 @@ determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS R
     RoomR
 determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Close)}) Mono =
     RideC
+-- Multi Velocity Kits
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    KickL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS FullMix)}) RightA =
+    KickR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    SnareL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS FullMix)}) RightA =
+    SnareR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ FullMix)}) LeftA =
+    HiHatL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ FullMix)}) RightA =
+    HiHatR
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS FullMix)}) LeftA =
+    TomL x
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS FullMix)}) RightA =
+    TomR x
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS FullMix)}) LeftA =
+    FloorTomL x
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS FullMix)}) RightA =
+    FloorTomR x
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    RideL
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS FullMix)}) RightA =
+    RideR
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS FullMix)}) RightA =
+    OHR
 determineChannel _ _ = Undefined
 
 
@@ -281,6 +310,7 @@ micType = do
     genTry "CL" Close
     <|> genTry "OH" Overhead
     <|> genTry "RM" Room
+    <|> genTry "FL" FullMix
 
 
 
@@ -330,7 +360,7 @@ kitNumber = do
 
 velocity :: Parsec Text u Int
 velocity = do
-    void $ char 'V'
+    void $ optional (char 'V')
     n <- many1 digit
     return (read n)
 

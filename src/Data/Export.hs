@@ -3,12 +3,16 @@ module Data.Export
     (
     convertToInstrumentXML,
     convertToMidiMapXML,
-    convertToDrumkitXML
+    convertToDrumkitXML,
+    convertToTabSep
     )
 where
 
 
 import Data.Text (pack)
+import qualified Data.Text.Lazy as L
+import Data.Text.Lazy.Builder as L
+import Data.Text.Lazy.Builder.Int as L
 import Text.XML.Generator
 import Data.Types
 import qualified Data.ByteString.Lazy as B
@@ -65,4 +69,12 @@ convertToDrumkitXML dr = xrender $
         channelmap x = xelems (map chm (cmMap x))
         chm (c1, c2) = xelem "channelmap" (xattr "in" c1 <> xattr "out" c2)
 
+
+convertToTabSep :: MidiMap -> L.Text
+convertToTabSep mm =
+    let ls = mmNote mm
+        f (note, inst) b = fromText inst <> fromText "\t" <> decimal note <> fromText "\t" <> fromText (midiToNote note) <> fromText "\n" <> b
+        header = "Instrument\tMIDI\tNote\n"
+    in
+    toLazyText $ header <> foldr f (fromText "") ls
 

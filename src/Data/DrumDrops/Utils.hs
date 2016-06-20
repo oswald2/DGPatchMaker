@@ -65,7 +65,7 @@ getSamples samplesDir path = do
                     info <- getFileInfo (path </> c)
                     return (getSampleFromFileName c (channels info))
 
-            res <- mapM proc cont
+            res <- mapM proc $ filter (\x -> takeExtension x == ".wav" || takeExtension x == ".WAV") cont
 
             let
                 spls = rights res

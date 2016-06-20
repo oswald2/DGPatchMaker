@@ -17,6 +17,7 @@ import Data.DrumDrops.Utils
 import Data.Char (isSpace)
 import Data.Export
 import Data.Drumgizmo
+--import Data.Import
 import Data.Either
 
 import qualified Data.ByteString.Lazy as B
@@ -98,13 +99,21 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
     initTvInstruments tvInstruments lsinst
     initTvChannelMap tvChannelMap lscm
 
-    entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples" :: FilePath)
-    entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Kontakt Pack Samples/Kontakt Pack Samples" :: FilePath)
+    entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
+    entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
 
-    entrySetText eName ("MapexHeavyRockAllSamples" :: Text)
+    entrySetText eName ("MapexHeavyRockMultiVelocity" :: Text)
 
-    midiMapGm <- initMidiMap mainWindow tvMidiGM
-    midiMapDef <- initMidiMap mainWindow tvMidiDef
+    gmLoadButton <- builderGetObject builder castToButton ("buttonLoadGMMap" :: Text)
+    gmExportButton <- builderGetObject builder castToButton ("buttonExportGMMap" :: Text)
+
+    defLoadButton <- builderGetObject builder castToButton ("buttonLoadDefMap" :: Text)
+    defExportButton <- builderGetObject builder castToButton ("buttonExportDefMap" :: Text)
+
+    resetButton <- builderGetObject builder castToButton ("buttonReset" :: Text)
+
+    midiMapGm <- initMidiMap mainWindow tvMidiGM entryBaseDirectory gmLoadButton gmExportButton
+    midiMapDef <- initMidiMap mainWindow tvMidiDef entryBaseDirectory defLoadButton defExportButton
 
     let gui = DrumkitPage{
             guiDkParentWindow = mainWindow,
@@ -137,6 +146,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
 
     void $ G.on buttonImportDrumkit buttonActivated $ importDrumDropsDrumKit gui
     void $ G.on buttonExportDrumkit buttonActivated $ exportDrumKit gui
+
+    void $ G.on resetButton buttonActivated $ resetDrumkit gui
 
     setupCallbacks gui
 
@@ -483,8 +494,8 @@ exportDrumKit gui = do
                     gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
                     defMidi <- getMidiMapFromGUI (guiMidiMapDef gui)
 
-                    writeMidiMapFile gui basepath "MIDIMap_GM.xml" gmMidi
-                    writeMidiMapFile gui basepath "MIDIMap_Default.xml" defMidi
+                    writeMidiMapFile (guiMidiMapGM gui) "MIDIMap_GM.xml" gmMidi
+                    writeMidiMapFile (guiMidiMapDef gui) "MIDIMap_Default.xml" defMidi
 
 
 
@@ -535,15 +546,20 @@ exportInstruments gui = do
             displayInfoBox (guiDkParentWindow gui) "Successfully exported drumkit."
 
 
-writeMidiMapFile :: DrumkitPage -> FilePath -> Text -> MidiMap -> IO ()
-writeMidiMapFile gui basepath filename midimap = do
-    catch (writeMidiMapFile' gui basepath filename midimap)
-        (\e -> displayErrorBox (guiDkParentWindow gui) ("Error during MIDI map export: " <> pack (show (e :: SomeException))))
 
-writeMidiMapFile' :: DrumkitPage -> FilePath -> Text -> MidiMap -> IO ()
-writeMidiMapFile' _ basepath filename midimap = do
-    let content = convertToMidiMapXML midimap
-        path = getDrumgizmoDir basepath </> unpack filename
+resetDrumkit :: DrumkitPage -> IO ()
+resetDrumkit gui = do
+    listStoreClear (guiTvChannelsModel gui)
+    listStoreClear (guiTvInstrumentsModel gui)
+    listStoreClear (guiTvChannelMapModel gui)
 
-    B.writeFile path content
+    writeIORef (guiDrumkit gui) Nothing
 
+    v <- readIORef (guiDkInstrumentPages gui)
+    V.mapM_ resetInstrumentPage v
+    writeIORef (guiDkInstrumentPages gui) empty
+
+    resetMidiMap (guiMidiMapGM gui)
+    resetMidiMap (guiMidiMapDef gui)
+
+    return ()

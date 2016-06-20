@@ -7,10 +7,11 @@ module Gtk.InstrumentFrame
     ,insertInstrumentPage
     ,setInstrumentFile
     ,writeInstrumentFile
+    ,resetInstrumentPage
     )
 where
 
-import Control.Monad (void, when)
+import Control.Monad (void, when, forM_)
 import Control.Monad.IO.Class (liftIO)
 --import Control.Exception
 
@@ -35,7 +36,7 @@ import Data.Drumgizmo
 import Data.Export
 import Data.Maybe
 import Data.Char (isSpace)
-import Data.Vector as V
+import qualified Data.Vector as V
 
 import Data.DrumDrops.Utils
 
@@ -50,7 +51,7 @@ data InstrumentPage = InstrumentPage {
     guiIPNotebook :: Notebook,
     guiIPEntryBaseDir :: Entry,
     guiIPEntrySamplesDir :: Entry,
-    guiIPInstrumentPages :: IORef (Vector InstrumentPage),
+    guiIPInstrumentPages :: IORef (V.Vector InstrumentPage),
     guiInstHitView :: TreeView,
     guiInstHitViewModel :: ListStore HitSample,
     guiRendererHP :: CellRendererText,
@@ -68,7 +69,7 @@ data InstrumentPage = InstrumentPage {
 
 
 
-newInstrumentPage :: Window -> Notebook -> Entry -> Entry -> IORef (Vector InstrumentPage) -> IO InstrumentPage
+newInstrumentPage :: Window -> Notebook -> Entry -> Entry -> IORef (V.Vector InstrumentPage) -> IO InstrumentPage
 newInstrumentPage parentWindow notebook basedir samplesDir ioref = do
     -- Create the builder, and load the UI file
     builder <- builderNew
@@ -521,7 +522,18 @@ setNotebookCurrentPageLabel instPage name = do
         Nothing -> return ()
 
 
+resetInstrumentPage :: InstrumentPage -> IO ()
+resetInstrumentPage gui = do
+    listStoreClear (guiInstSamplesViewModel gui)
+    listStoreClear (guiInstHitViewModel gui)
 
+    writeIORef (guiInstFile gui) Nothing
+
+    n <- notebookGetNPages (guiIPNotebook gui)
+    forM_ [0..(n-1)] $ \_ ->
+        notebookRemovePage (guiIPNotebook gui) (-1)
+
+    return ()
 
 
 

@@ -9,7 +9,7 @@ import Data.Set as S
 import System.FilePath
 import Text.Parsec as P
 import Data.List (sortOn)
-
+import qualified Data.IntMap.Strict as M
 
 data Drumkit = Drumkit {
     dkName :: !Text,
@@ -64,6 +64,7 @@ data MicType =
     | Sub
     | Overhead
     | Room
+    | FullMix
     deriving (Show, Enum, Ord, Eq)
 
 data HiHatState =
@@ -141,10 +142,14 @@ data Microphones =
     | FloorTomL Int
     | FloorTomR Int
     | RideC
+    | RideL
+    | RideR
     | OHL
     | OHR
     | RoomL
     | RoomR
+    | FullMixL
+    | FullMixR
     | Undefined
 
 
@@ -167,10 +172,14 @@ instance Show Microphones where
     show (FloorTomL x) =     "FloorTomL" ++ show x
     show (FloorTomR x) =     "FloorTomR" ++ show x
     show (RideC) =      "RideC"
+    show (RideL) =      "RideL"
+    show (RideR) =      "RideR"
     show OHL =          "OHL"
     show OHR =          "OHR"
     show RoomL =        "RoomL"
     show RoomR =        "RoomR"
+    show FullMixL =        "FullMixL"
+    show FullMixR =        "FullMixR"
     show Undefined =    "Undefined"
 
 instance Ord Microphones where
@@ -195,10 +204,14 @@ micToInt (FloorTomC x) = 40 + x
 micToInt (FloorTomL x) = 50 + x
 micToInt (FloorTomR x) = 60 + x
 micToInt RideC = 70
-micToInt OHL = 71
-micToInt OHR = 72
-micToInt RoomL = 73
-micToInt RoomR = 74
+micToInt RideL = 71
+micToInt RideR = 72
+micToInt OHL = 73
+micToInt OHR = 74
+micToInt RoomL = 75
+micToInt RoomR = 76
+micToInt FullMixL = 77
+micToInt FullMixR = 78
 micToInt Undefined = 100
 
 instance Eq Microphones where
@@ -242,10 +255,14 @@ micParser = do
         n <- many1 digit
         return (FloorTomR (read n))
     <|> (try (string "RideC"        ) >> return RideC       )
+    <|> (try (string "RideL"        ) >> return RideL       )
+    <|> (try (string "RideR"        ) >> return RideR       )
     <|> (try (string "OHL"          ) >> return OHL         )
     <|> (try (string "OHR"          ) >> return OHR         )
     <|> (try (string "RoomL"        ) >> return RoomL       )
     <|> (try (string "RoomR"        ) >> return RoomR       )
+    <|> (try (string "FullMixL"     ) >> return FullMixL    )
+    <|> (try (string "FullMixR"     ) >> return FullMixR    )
     <|> return Undefined
 
 
@@ -310,4 +327,22 @@ getMidiNoteFromInstrument (Tom (Floor _)) = 43
 getMidiNoteFromInstrument (Tom (RackTom _)) = 45
 getMidiNoteFromInstrument Cymbal = 55
 getMidiNoteFromInstrument Ride = 51
+
+
+
+midiNotes :: M.IntMap Text
+midiNotes = M.fromList (Prelude.zip midi finalNotes)
+    where
+        midi = [0 .. 127]
+        octaves = [ (-2)..8] :: [Int]
+        notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+        f oct note = note `append` pack (show oct)
+        g oct = Prelude.map (f oct) notes
+        finalNotes = Prelude.concatMap g octaves
+
+
+midiToNote :: Int -> Text
+midiToNote x = maybe "--" id $ M.lookup x midiNotes
+
+
 
