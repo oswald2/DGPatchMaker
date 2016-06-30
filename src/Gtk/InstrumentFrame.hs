@@ -36,6 +36,7 @@ import Data.Drumgizmo
 import Data.Export
 import Data.Maybe
 import Data.Char (isSpace)
+import Data.Either
 import qualified Data.Vector as V
 
 import Data.DrumDrops.Utils
@@ -43,6 +44,9 @@ import Data.DrumDrops.Utils
 import System.FilePath
 
 import Gtk.InstrumentPageBuilder
+
+import Sound.File.Sndfile (getFileInfo, Info(..))
+
 
 
 
@@ -142,6 +146,9 @@ newInstrumentPage parentWindow notebook basedir samplesDir ioref = do
     void $ on buttonOpenSamples buttonActivated (addSamples treeviewSamples sals)
     void $ on menuRemoveSample menuItemActivate (removeSamples treeviewSamples sals)
 
+    void $ on treeviewSamples dragDrop $ dragDropSignal gui
+    void $ on treeviewSamples dragDataReceived $ dragDataReceivedSignal gui
+
     void $ on entryName entryActivated $ do
         txt' <- entryGetText entryName
         let txt = T.filter (not.isSpace) txt
@@ -152,6 +159,70 @@ newInstrumentPage parentWindow notebook basedir samplesDir ioref = do
     setupCallbacks gui
 
     return gui
+
+dragDataReceivedSignal :: InstrumentPage -> DragContext -> Point -> InfoId -> TimeStamp -> SelectionDataM ()
+dragDataReceivedSignal gui dragContext _ infoId timestamp = do
+    txt <- selectionDataGetText
+    liftIO $ do
+        maybe (return ()) (dropAction gui) txt
+
+        dragFinish dragContext True False timestamp
+    return ()
+
+
+-- called when a drag and drop was done. The data of the drag and
+-- drop is in the Text argument which is a list of filenames in
+-- this case
+dropAction :: InstrumentPage -> Text -> IO ()
+dropAction gui x = do
+    case checkFileNames x of
+        Left err -> displayErrorBox (guiMainWindow gui) err
+        Right lst -> do
+            print lst
+            af <- getAudioSamplesFromFiles lst
+            return ()
+
+
+checkFileNames :: Text -> Either Text [FilePath]
+checkFileNames =
+    conv . P.map chk . T.lines
+    where
+        chk :: Text -> Either Text FilePath
+        chk x =
+            let prefix = "file://"
+                x' = if prefix `T.isPrefixOf` x
+                        then T.unpack (T.drop (T.length prefix) x)
+                        else (T.unpack x)
+                file = P.filter (/= '\r') x'
+            in
+            if (takeExtension file) == ".wav"
+                then Right file
+                else Left $ "Illegal file: " `T.append` (T.pack file)
+        conv :: [Either Text FilePath] -> Either Text [FilePath]
+        conv xs =
+            let lef = lefts xs
+            in
+            if P.null lef then Right (rights xs) else Left (T.unlines lef)
+
+
+getAudioSamplesFromFiles :: [FilePath] -> IO [AudioFile]
+getAudioSamplesFromFiles files = do
+    res <- mapM getAudioSampleFromFile files
+    return (P.concat res)
+
+getAudioSampleFromFile :: FilePath -> IO [AudioFile]
+getAudioSampleFromFile file = do
+    info <- getFileInfo file
+    let idx = [1..channels info]
+    return $ P.map (\x -> AudioFile Undefined file (fromIntegral x)) idx
+
+
+
+dragDropSignal :: InstrumentPage -> DragContext -> Point -> TimeStamp -> IO Bool
+dragDropSignal gui dragContext _ timestamp = do
+    liftIO $ T.putStrLn "dragDrop called!"
+    dragGetData (guiInstSamplesView gui) dragContext targetString timestamp
+    return True
 
 
 importDrumDropsInstrument :: InstrumentPage -> IO ()
@@ -299,7 +370,15 @@ initTreeViewSamples tv ls = do
         row <- listStoreGetValue ls i
         return $ toLower str `T.isPrefixOf` toLower (pack (afPath row))
 
+    tls <- targetListNew
+    targetListAdd tls targetString [TargetOtherApp] dndInfoId
+    treeViewEnableModelDragDest tv tls [ActionCopy]
+
     return (renderer1, renderer3)
+
+
+dndInfoId :: InfoId
+dndInfoId = 1
 
 
 
