@@ -64,19 +64,20 @@ data InstrumentPage = InstrumentPage {
     guiEntryVersion :: Entry,
     guiEntryName :: Entry,
     guiEntryType :: Entry,
-    guiAudioSamplesMenu :: Menu
+    guiAudioSamplesMenu :: Menu,
+    guiIPParserCombo :: ComboBox
     }
 
 
 
 
-newInstrumentPage :: Window -> Notebook -> Entry -> Entry -> IORef (V.Vector InstrumentPage) -> IO InstrumentPage
-newInstrumentPage parentWindow notebook basedir samplesDir ioref = do
+newInstrumentPage :: Window -> Notebook -> Entry -> Entry -> ComboBox -> IORef (V.Vector InstrumentPage) -> IO InstrumentPage
+newInstrumentPage parentWindow notebook basedir samplesDir combo ioref = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
-    --builderAddFromFile builder "InstrumentPage.glade"
-    builderAddFromString builder builderFileAsString
+    builderAddFromFile builder "InstrumentPage.glade"
+    --builderAddFromString builder builderFileAsString
 
     -- Retrieve some objects from the UI
     mainBox <- builderGetObject builder castToBox ("mainBox" :: Text)
@@ -123,7 +124,8 @@ newInstrumentPage parentWindow notebook basedir samplesDir ioref = do
         guiAudioSamplesMenu = popUp,
         guiRendererChan = rendChan,
         guiRendererFileChan = rendFileChan,
-        guiIPInstrumentPages = ioref
+        guiIPInstrumentPages = ioref,
+        guiIPParserCombo = combo
         }
 
     -- set the default values for this instrument page
@@ -170,6 +172,9 @@ importDrumDropsInstrument instPage = do
     basedir <- entryGetText (guiIPEntryBaseDir instPage)
     sampleDir <- entryGetText (guiIPEntrySamplesDir instPage)
 
+    pt <- comboBoxGetActiveText (guiIPParserCombo instPage)
+    let parserType = maybe MapexParser (read . unpack) pt
+
     case basedir of
         "" -> do
             dial <- messageDialogNew (Just parentWindow) [DialogDestroyWithParent] MessageError ButtonsClose ("Base Directory not set!" :: Text)
@@ -185,7 +190,7 @@ importDrumDropsInstrument instPage = do
                 ResponseAccept -> do
                     Just instrumentDir <- fileChooserGetFilename dialog
 
-                    result <- importInstrument basedir sampleDir instrumentDir
+                    result <- importInstrument parserType basedir sampleDir instrumentDir
                     case result of
                         Right instrumentFile -> do
                             setInstrumentFile instPage instrumentFile

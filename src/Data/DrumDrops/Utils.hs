@@ -14,19 +14,28 @@ import Data.Text (Text, pack, append)
 import Data.Either
 import Data.Char (isSpace)
 import Data.DrumDrops.Types
+import qualified Data.DrumDrops.MapexKitParser as MP
 
 import Data.Types
 
 import Sound.File.Sndfile (getFileInfo, Info(..))
 
+import Text.Parsec (ParseError)
 
 
-importInstrument :: FilePath -> FilePath -> FilePath -> IO (Either Text InstrumentFile)
-importInstrument basepath samplesPath path = do
+
+data ParserType = MapexParser
+    deriving (Enum, Eq, Ord, Show, Read)
+
+
+
+
+importInstrument :: ParserType -> FilePath -> FilePath -> FilePath -> IO (Either Text InstrumentFile)
+importInstrument parserType basepath samplesPath path = do
 
     putStrLn $ "Importing Instrument from: " ++ path
 
-    w <- getSamples samplesPath path
+    w <- getSamples parserType samplesPath path
     case w of
         Left err -> return (Left err)
         Right wavFiles -> return (Right (convertSampleGroup basepath wavFiles))
@@ -54,8 +63,8 @@ getVelocityGroups ss =
     in
     map crV gs
 
-getSamples :: FilePath -> FilePath -> IO (Either Text SampleGroup)
-getSamples samplesDir path = do
+getSamples :: ParserType -> FilePath -> FilePath -> IO (Either Text SampleGroup)
+getSamples parserType samplesDir path = do
     fs <- getFiles path
     case fs of
         Left err -> return (Left err)
@@ -63,7 +72,7 @@ getSamples samplesDir path = do
             -- get audio information out of the wav files
             let proc c = do
                     info <- getFileInfo (path </> c)
-                    return (getSampleFromFileName c (channels info))
+                    return (getSampleFromFileName parserType c (channels info))
 
             res <- mapM proc $ filter (\x -> takeExtension x == ".wav" || takeExtension x == ".WAV") cont
 
@@ -93,4 +102,5 @@ pathToInstrument sampleDir path' =
 
 
 
-
+getSampleFromFileName :: ParserType -> FilePath -> Int -> Either ParseError Sample
+getSampleFromFileName MapexParser = MP.getSampleFromFileName

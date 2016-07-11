@@ -27,8 +27,8 @@ initMainWindow = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
-    --builderAddFromFile builder "DGPatchMaker.glade"
-    builderAddFromString builder builderFileAsString
+    builderAddFromFile builder "DGPatchMaker.glade"
+    --builderAddFromString builder builderFileAsString
 
     -- Retrieve some objects from the UI
     window <- builderGetObject builder castToWindow ("mainWindow" :: Text)
@@ -45,10 +45,12 @@ initMainWindow = do
 
     progress <- builderGetObject builder castToProgressBar ("progressbar" :: Text)
 
+    combo <- builderGetObject builder castToComboBox ("comboboxParser" :: Text)
+
     instPages <- newIORef (V.empty)
 
     -- initialise the drumkit page
-    drumkitPage <- initDrumkitPage window builder notebookInstruments progress entryBaseDirectory entrySamplesDir instPages
+    drumkitPage <- initDrumkitPage window builder notebookInstruments progress combo entryBaseDirectory entrySamplesDir instPages
 
     let gui = MainWindow {
         guiWindow = window,
@@ -62,7 +64,7 @@ initMainWindow = do
     --insertInstrumentPage inst
 
     void $ on buttonNewInstrument buttonActivated $ do
-        ins <- newInstrumentPage window notebookInstruments entryBaseDirectory entrySamplesDir instPages
+        ins <- newInstrumentPage window notebookInstruments entryBaseDirectory entrySamplesDir combo instPages
         i <- notebookAppendPage notebookInstruments (getMainBox ins) ("Instrument 1" :: Text)
         insertInstrumentPage ins
         notebookSetCurrentPage notebookInstruments i

@@ -6,6 +6,8 @@ where
 
 import ClassyPrelude
 
+import Prelude (read)
+
 --import Control.Monad (void)
 --import Control.Exception
 
@@ -58,7 +60,8 @@ data DrumkitPage = DrumkitPage {
     guiDkInstrumentPages :: IORef (Vector InstrumentPage),
     guiErrDiag :: ErrorDialog,
     guiMidiMapGM :: MidiMapPage,
-    guiMidiMapDef :: MidiMapPage
+    guiMidiMapDef :: MidiMapPage,
+    guiParserCombo :: ComboBox
 }
 
 
@@ -66,11 +69,12 @@ initDrumkitPage :: Window ->
                     G.Builder ->
                     Notebook ->
                     ProgressBar ->
+                    ComboBox ->
                     Entry ->
                     Entry ->
                     IORef (Vector InstrumentPage) ->
                     IO DrumkitPage
-initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirectory entrySamplesDir ioref = do
+initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir ioref = do
 
     buttonImportDrumkit <- builderGetObject builder castToButton ("buttonImportDrumkit" :: Text)
     buttonExportDrumkit <- builderGetObject builder castToButton ("buttonExportDrumkit" :: Text)
@@ -115,6 +119,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
     midiMapGm <- initMidiMap mainWindow tvMidiGM entryBaseDirectory gmLoadButton gmExportButton
     midiMapDef <- initMidiMap mainWindow tvMidiDef entryBaseDirectory defLoadButton defExportButton
 
+    initParserCombo combo
+
     let gui = DrumkitPage{
             guiDkParentWindow = mainWindow,
             guiTvChannels = tvChannels,
@@ -136,7 +142,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
             guiErrDiag = errDiag,
             guiDkInstrumentPages = ioref,
             guiMidiMapGM = midiMapGm,
-            guiMidiMapDef = midiMapDef
+            guiMidiMapDef = midiMapDef,
+            guiParserCombo = combo
         }
 
     setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
@@ -171,7 +178,13 @@ setDkDescription dkp desc = do
     buffer <- textViewGetBuffer (guiDkDescription dkp)
     textBufferSetText buffer desc
 
-
+initParserCombo :: ComboBox -> IO ()
+initParserCombo cb = do
+    void $ comboBoxSetModelText cb
+    void $ mapM (comboBoxAppendText cb) str
+    comboBoxSetActive cb 0
+    where
+        str = map (pack . show) [MapexParser]
 
 setBaseDir :: DrumkitPage -> IO ()
 setBaseDir mainWindow = do
@@ -241,8 +254,10 @@ setSamplesDir mainWindow = do
 
 importDrumDropsDrumKit :: DrumkitPage -> IO ()
 importDrumDropsDrumKit gui = do
+    widgetSetSensitive (guiParserCombo gui) False
     catch (importDrumDropsDrumKit' gui)
         (\e -> displayErrorBox (guiDkParentWindow gui) ("Error: " <> pack (show (e :: SomeException))))
+    widgetSetSensitive (guiParserCombo gui) True
 
 
 
@@ -307,12 +322,15 @@ importDrumDropsDrumKit' gui = do
 
         doSingleImport progress basedir samplesDir step path = do
             ins <- newInstrumentPage (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
-                (guiBaseDir gui) (guiSamplesDir gui) (guiDkInstrumentPages gui)
+                (guiBaseDir gui) (guiSamplesDir gui) (guiParserCombo gui) (guiDkInstrumentPages gui)
             let instName = pathToInstrument samplesDir path
             _ <- notebookAppendPage (guiDkInstrumentsNotebook gui) (getMainBox ins) instName
             insertInstrumentPage ins
 
-            res <- importInstrument basedir samplesDir path
+            pt <- comboBoxGetActiveText (guiParserCombo gui)
+            let parserType = maybe MapexParser (read . unpack) pt
+
+            res <- importInstrument parserType basedir samplesDir path
             case res of
                 Left err -> do
                     displayErrorBox (guiDkParentWindow gui) err

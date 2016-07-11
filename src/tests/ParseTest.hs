@@ -3,7 +3,10 @@ module Main
 
 where
 
+
 import System.FilePath
+import System.Environment
+import System.Exit
 
 import Data.DrumDrops.Types
 import Data.DrumDrops.Utils
@@ -34,55 +37,31 @@ samplesPath = "/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Ko
 
 main :: IO ()
 main = do
-
-    let
-        dgInstrumentsPath = getInstrumentDir basepath
-        dgPath = getDrumgizmoDir basepath
-
-    dir <- createDrumgizmoDirectories basepath
-    case dir of
-        Left err -> T.putStrLn err
-        Right () -> do
-
-            -- create the instrument file
-            w <- importInstrument basepath samplesPath path
-            case w of
-                Left err -> T.putStrLn err
-                Right instrumentFile -> do
-                    let
-                        --content = convertToInstrumentXML instrumentFile
-                        filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
-                    --B.writeFile filename content
-                    writeInstrumentXML instrumentFile filename
-
-                    -- create the drumkit
-                    let drumkit = generateDrumkit "TestKit" "This is a description" [instrumentFile]
-                        --drumkitCont = convertToDrumkitXML drumkit
-                        drumkitFName = dgPath </> unpack (dkName drumkit) <.> ".xml"
-                    --B.writeFile drumkitFName drumkitCont
-                    writeDrumKitXML drumkit drumkitFName
-
-                    -- create the midimap
-                    let mm = MidiMap (Prelude.zip [35..] insts)
-                        insts = getInstrumentNames drumkit
-                        --midimapCont = convertToMidiMapXML mm
-                        midiMapFName = dgPath </> unpack (dkName drumkit) ++ "_MidiMap" <.> ".xml"
-                    --B.writeFile midiMapFName midimapCont
-                    writeMidiMapXML mm midiMapFName
+    [parserType, file] <- getArgs
+    content <- T.readFile file
+    mapM_ (f parserType) (T.lines content)
+    where
+        f parserType x = do
+            T.putStrLn x
+            let res = getSampleFromFileName (read parserType) (unpack x) 1
+            case res of
+                Left err -> do
+                    Prelude.putStrLn (show err)
+                    exitFailure
+                Right x -> print x
 
 
+--printSample :: Sample -> IO ()
+--printSample x = Prelude.putStrLn (show x)
 
-printSample :: Sample -> IO ()
-printSample x = Prelude.putStrLn (show x)
 
+--printSampleGroup :: SampleGroup -> IO ()
+--printSampleGroup x = do
+    --T.putStrLn ("Path: " `T.append` T.pack (sgPath x))
+    --T.putStrLn ("Instrument: " `T.append` sgInstName x)
+    --mapM_ printGroup (sgGroups x)
 
-printSampleGroup :: SampleGroup -> IO ()
-printSampleGroup x = do
-    T.putStrLn ("Path: " `T.append` T.pack (sgPath x))
-    T.putStrLn ("Instrument: " `T.append` sgInstName x)
-    mapM_ printGroup (sgGroups x)
-
-printGroup :: VelocityGroup -> IO ()
-printGroup x = do
-    T.putStrLn ("Group: Velocity: " `append` pack (show (vgVelocity x)) `append` " Round Robin: " `append` pack (show (vgRR x)))
-    mapM_ printSample (vgSamples x)
+--printGroup :: VelocityGroup -> IO ()
+--printGroup x = do
+    --T.putStrLn ("Group: Velocity: " `append` pack (show (vgVelocity x)) `append` " Round Robin: " `append` pack (show (vgRR x)))
+    --mapM_ printSample (vgSamples x)
