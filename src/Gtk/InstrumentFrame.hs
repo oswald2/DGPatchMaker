@@ -27,7 +27,7 @@ import Data.Text as T
 import Data.Text.IO as T
 --import qualified Data.Text.Lazy as TL
 --import Data.Text.Format
-import qualified Data.ByteString.Lazy as B
+--import qualified Data.ByteString.Lazy as B
 
 import Data.Types
 import Data.IORef
@@ -467,9 +467,12 @@ writeInstrumentFile instPage = do
 
             let
                 dgInstrumentsPath = getInstrumentDir basepath
-                content = convertToInstrumentXML instrumentFile
+                --content = convertToInstrumentXML instrumentFile
                 filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
-            B.writeFile filename content
+
+            writeInstrumentXML instrumentFile filename
+            --B.writeFile filename content
+
             return $ Right filename
 
 

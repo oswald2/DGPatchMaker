@@ -65,6 +65,10 @@ data MicType =
     | Overhead
     | Room
     | FullMix
+    | Kit1
+    | Kit2
+    | KickClose
+    | SnareClose
     deriving (Show, Enum, Ord, Eq)
 
 data HiHatState =

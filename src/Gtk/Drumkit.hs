@@ -20,7 +20,7 @@ import Data.Drumgizmo
 --import Data.Import
 import Data.Either
 
-import qualified Data.ByteString.Lazy as B
+--import qualified Data.ByteString.Lazy as B
 
 import qualified Data.Vector as V
 
@@ -184,6 +184,9 @@ setBaseDir mainWindow = do
                ,ResponseCancel)
               ,("gtk-open"
                , ResponseAccept)]
+
+    basepath <- entryGetText (guiBaseDir mainWindow)
+    void $ fileChooserSetFilename dialog basepath
 
     widgetShow dialog
     resp <- dialogRun dialog
@@ -523,10 +526,14 @@ writeDrumKitFile' gui nm basepath = do
                     insts <- listStoreToList (guiTvInstrumentsModel gui)
                     basedir <- entryGetText (guiBaseDir gui)
                     let d' = d {dkName = nm, dkDescription = desc, dkChannels = channels, dkInstruments = insts}
-                        drumkitCont = convertToDrumkitXML d'
+                        --drumkitCont = convertToDrumkitXML d'
                         dgPath = getDrumgizmoDir basedir
                         drumkitFName = dgPath </> unpack nm <.> ".xml"
-                    B.writeFile drumkitFName drumkitCont
+
+                    writeIORef (guiDrumkit gui) (Just d')
+
+                    writeDrumKitXML d' drumkitFName
+                    --B.writeFile drumkitFName drumkitCont
 
                     -- also export the instrument files
                     exportInstruments gui

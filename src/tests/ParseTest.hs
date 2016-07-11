@@ -10,7 +10,7 @@ import Data.DrumDrops.Utils
 
 import Data.Text as T
 import Data.Text.IO as T
-import qualified Data.ByteString.Lazy as B
+--import qualified Data.ByteString.Lazy as B
 --import Data.List (sort)
 --import Data.Either
 
@@ -50,22 +50,25 @@ main = do
                 Left err -> T.putStrLn err
                 Right instrumentFile -> do
                     let
-                        content = convertToInstrumentXML instrumentFile
+                        --content = convertToInstrumentXML instrumentFile
                         filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
-                    B.writeFile filename content
+                    --B.writeFile filename content
+                    writeInstrumentXML instrumentFile filename
 
                     -- create the drumkit
                     let drumkit = generateDrumkit "TestKit" "This is a description" [instrumentFile]
-                        drumkitCont = convertToDrumkitXML drumkit
+                        --drumkitCont = convertToDrumkitXML drumkit
                         drumkitFName = dgPath </> unpack (dkName drumkit) <.> ".xml"
-                    B.writeFile drumkitFName drumkitCont
+                    --B.writeFile drumkitFName drumkitCont
+                    writeDrumKitXML drumkit drumkitFName
 
                     -- create the midimap
                     let mm = MidiMap (Prelude.zip [35..] insts)
                         insts = getInstrumentNames drumkit
-                        midimapCont = convertToMidiMapXML mm
+                        --midimapCont = convertToMidiMapXML mm
                         midiMapFName = dgPath </> unpack (dkName drumkit) ++ "_MidiMap" <.> ".xml"
-                    B.writeFile midiMapFName midimapCont
+                    --B.writeFile midiMapFName midimapCont
+                    writeMidiMapXML mm midiMapFName
 
 
 

@@ -285,6 +285,7 @@ sampleParser fname nChannels = do
 instrument :: Parsec Text u Instrument
 instrument = do
     (try (string "SNR") >> return Snare)
+    <|> (try (string "SN") >> return Snare)
     <|> (try (string "KICK") >> return Kick)
     <|> (try (string "HAT") >> return HiHat)
     <|> try toms
@@ -311,6 +312,10 @@ micType = do
     <|> genTry "OH" Overhead
     <|> genTry "RM" Room
     <|> genTry "FL" FullMix
+    <|> genTry "K1" Kit1
+    <|> genTry "K2" Kit2
+    <|> genTry "KK" KickClose
+    <|> genTry "SN" SnareClose
 
 
 
@@ -341,9 +346,24 @@ hiHat = do
     return (HiHatS st mt)
 
 
+--instState :: Parsec Text u InstState
+--instState = do
+    --try $ do
+        --mt <- micType
+        --return (InstS mt)
+    -- <|> do
+        --void $ P.count 2 upper
+        --void $ optional (char '_')
+        --mt <- micType
+        --sb <- try (string "SB") <|> return ""
+        --case sb of
+            --"SB" -> return (InstS Sub)
+            --_ -> return (InstS mt)
+
 instState :: Parsec Text u InstState
 instState = do
     void $ P.count 2 upper
+    void $ optional (char '_')
     mt <- micType
     sb <- try (string "SB") <|> return ""
     case sb of

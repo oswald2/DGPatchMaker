@@ -20,7 +20,7 @@ import Data.Export
 
 import qualified Data.Text as T
 import qualified Data.Text.Lazy.IO as L
-import qualified Data.ByteString.Lazy as B
+--import qualified Data.ByteString.Lazy as B
 import qualified Data.Vector as V
 
 import Graphics.UI.Gtk as G
@@ -297,12 +297,13 @@ writeMidiMapFile gui filename midimap = do
 writeMidiMapFile' :: MidiMapPage -> Text -> MidiMap -> IO ()
 writeMidiMapFile' gui filename midimap = do
     basepath <- entryGetText (mmBasePath gui)
-    let content = convertToMidiMapXML midimap
+    let --content = convertToMidiMapXML midimap
         content2 = convertToTabSep midimap
         path = getDrumgizmoDir basepath </> unpack filename
         path2 = replaceExtension path ".txt"
 
-    B.writeFile path content
+    --B.writeFile path content
+    writeMidiMapXML midimap path
     L.writeFile path2 content2
 
 

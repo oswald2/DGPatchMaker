@@ -1,73 +1,89 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 module Data.Export
     (
-    convertToInstrumentXML,
-    convertToMidiMapXML,
-    convertToDrumkitXML,
     convertToTabSep
+    ,writeMidiMapXML
+    ,writeInstrumentXML
+    ,writeDrumKitXML
     )
 where
 
 
+import Data.Monoid ((<>))
 import Data.Text (pack)
 import qualified Data.Text.Lazy as L
 import Data.Text.Lazy.Builder as L
 import Data.Text.Lazy.Builder.Int as L
-import Text.XML.Generator
 import Data.Types
-import qualified Data.ByteString.Lazy as B
+--import qualified Data.ByteString.Lazy as B
+
+import Text.XML.Stream.Render
+import Data.XML.Types
+import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as C
+import Control.Monad.Trans.Resource
 
 
 
-docInfo :: DocInfo
-docInfo = defaultDocInfo
 
 
-convertToInstrumentXML :: InstrumentFile -> B.ByteString
-convertToInstrumentXML (InstrumentFile{..}) = xrender $
-    doc docInfo $
-        xelem "instrument" (xattr "version" ifVersion <> xattr "name" ifName <#> xelem "samples" (samples ifSamples))
+writeInstrumentXML :: InstrumentFile -> FilePath -> IO ()
+writeInstrumentXML iF filename = do
+    runResourceT $ conduitInstrumentXML iF C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
 
-samples :: [HitSample] -> Xml Elem
-samples ss =
-    xelems $ map sampleNode ss
+
+conduitInstrumentXML :: Monad m => InstrumentFile -> C.Source m Event
+conduitInstrumentXML (InstrumentFile{..}) =
+    tag "instrument" (attr "version" ifVersion <> attr "name" ifName) (tag "samples" mempty (conduitSamples ifSamples))
+
+
+conduitSamples:: Monad m => [HitSample] -> C.Source m Event
+conduitSamples ss =
+    foldr f mempty ss
     where
-        sampleNode x =
-            xelem "sample" (xattr "name" (hsName x) <> xattr "power" ((pack.show.hsPower) x) <#> (audiofiles (hsSamples x)))
+        f x b = tag "sample" (attr "name" (hsName x) <> attr "power" ((pack.show.hsPower) x)) (conduitAudioFiles (hsSamples x)) <> b
 
-audiofiles :: [AudioFile] -> Xml Elem
-audiofiles afs =
-    xelems $ map audioF afs
+
+
+conduitAudioFiles:: Monad m => [AudioFile] -> C.Source m Event
+conduitAudioFiles afs =
+    foldr f mempty afs
     where
-        audioF x =
-            xelem "audiofile" (xattr "channel" (pack (show (afChannel x)))
-                            <> xattr "file" (pack (afPath x))
-                            <> xattr "filechannel" ((pack.show.afFileChannel) x))
+        f x b = tag "audiofile" (attr "channel" (pack (show (afChannel x)))
+                                <> attr "file" (pack (afPath x))
+                                <> attr "filechannel" ((pack.show.afFileChannel) x)) mempty <> b
 
 
-convertToMidiMapXML :: MidiMap -> B.ByteString
-convertToMidiMapXML (MidiMap mp) = xrender $
-    doc docInfo $
-        xelem "midimap" (xelems (map notes mp))
+conduitMidiMap :: Monad m => MidiMap -> C.Source m Event
+conduitMidiMap (MidiMap mp) =
+    tag "midimap" mempty noteEntries
     where
-        notes (i, inst) = xelem "map" (xattr "note" (pack (show i)) <> xattr "instr" inst)
+        noteEntries = foldr f mempty mp
+        f (note, instr) b = (tag "map" (attr "note" (pack (show note)) <> attr "instr" instr) mempty) <> b
+
+writeMidiMapXML :: MidiMap -> FilePath -> IO ()
+writeMidiMapXML mp filename = do
+    runResourceT $ conduitMidiMap mp C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
 
 
 
-convertToDrumkitXML :: Drumkit -> B.ByteString
-convertToDrumkitXML dr = xrender $
-    doc docInfo $
-        xelem "drumkit" (xattr "name" (dkName dr) <> xattr "description" (dkDescription dr) <#> channels <> instruments)
+conduitDrumKitXML :: Monad m => Drumkit -> C.Source m Event
+conduitDrumKitXML dr =
+    tag "drumkit" (attr "name" (dkName dr) <> attr "description" (dkDescription dr)) (channels <> instruments)
     where
-        channels = xelem "channels" (xelems (map ch (dkChannels dr)))
-        ch x = xelem "channel" (xattr "name" (pack (show x)))
-        instruments = xelem "instruments" (xelems (map ins (dkInstruments dr)))
-        ins x = xelem "instrument" (xattr "name" (cmName x) <> gr x <> xattr "file" (pack (cmFile x)) <#> channelmap x)
+        channels = tag "channels" mempty (foldr ch mempty (dkChannels dr))
+        ch x b = tag "channel" (attr "name" (pack (show x))) mempty <> b
+        instruments = tag "instruments" mempty ((foldr ins mempty (dkInstruments dr)))
+        ins x b = tag "instrument" (attr "name" (cmName x) <> gr x <> attr "file" (pack (cmFile x))) (channelmap x) <> b
         gr x = case cmGroup x of
-                    Just g -> xattr "group" g
+                    Just g -> attr "group" g
                     Nothing -> mempty
-        channelmap x = xelems (map chm (cmMap x))
-        chm (c1, c2) = xelem "channelmap" (xattr "in" c1 <> xattr "out" c2)
+        channelmap x = foldr chm mempty (cmMap x)
+        chm (c1, c2) b = tag "channelmap" (attr "in" c1 <> attr "out" c2) mempty <> b
+
+writeDrumKitXML :: Drumkit -> FilePath -> IO ()
+writeDrumKitXML dr filename = do
+    runResourceT $ conduitDrumKitXML dr C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
 
 
 convertToTabSep :: MidiMap -> L.Text
