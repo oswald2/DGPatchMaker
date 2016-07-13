@@ -2,6 +2,7 @@
 module Data.DrumDrops.ModernFolkParser
     (
     getSampleFromFileName
+    ,determineChannel
     )
 where
 
@@ -10,17 +11,16 @@ import Control.Monad (void)
 
 import Data.Text as T
 import Data.Types
---import Data.Maybe (isJust)
---import Data.Drumgizmo
---import Data.List (sort)
 
 import Text.Parsec as P
---import Text.Parsec.Char
 
 import System.FilePath
 
 import Data.DrumDrops.Types
 
+
+import Debug.Trace
+import Text.Printf
 
 
 getSampleFromFileName :: FilePath -> Int -> Either ParseError Sample
@@ -80,7 +80,7 @@ shakerParser fname nChannels = do
     v <- velocity
 
     rr <- roundRobin
-    let res = Sample fname "" inst (InstS Close) v rr nChannels
+    let res = Sample fname "" inst (InstS FullMix) v rr nChannels
     return res
 
 tambourineParser :: Text -> Word -> Parsec Text u Sample
@@ -91,7 +91,7 @@ tambourineParser fname nChannels = do
     v <- velocity
 
     rr <- roundRobin
-    let res = Sample fname "" inst (InstS Close) v rr nChannels
+    let res = Sample fname "" inst (InstS FullMix) v rr nChannels
     return res
 
 
@@ -163,17 +163,6 @@ hiHat st'' = do
     return (HiHatS st mt)
 
 
---instState :: Parsec Text u InstState
---instState = do
-    --void $ P.count 2 upper
-    --void $ optional (char '_')
-    ----void $ manyTill anyChar (try (lookAhead micType))
-    --mt <- micType
-    --sb <- try (string "SB") <|> return ""
-    --case sb of
-        --"SB" -> return (InstS Sub)
-        --_ -> return (InstS mt)
-
 instState :: Parsec Text u InstState
 instState = do
     void $  modifier
@@ -234,3 +223,176 @@ kitNumber = do
     void $ many1 digit
     return ()
 
+
+
+
+determineChannel :: Sample -> Channel -> Microphones
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) Mono =
+    KickC
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) LeftA =
+    KickL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Close)}) RightA =
+    KickR
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Sub)}) Mono =
+    KickS
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Close)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Close)}) LeftA =
+    SnareL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Close)}) RightA =
+    SnareR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Close)}) Mono =
+    HiHatC
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Close)}) LeftA =
+    HiHatL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Close)}) RightA =
+    HiHatR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS Close)}) Mono =
+    TomC x
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS Close)}) LeftA =
+    TomL x
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS Close)}) RightA =
+    TomR x
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS Close)}) Mono =
+    FloorTomC x
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS Close)}) LeftA =
+    FloorTomL x
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS Close)}) RightA =
+    FloorTomR x
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Overhead)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Overhead)}) RightA =
+    OHR
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Room)}) LeftA =
+    RoomL
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Room)}) RightA =
+    RoomR
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Close)}) Mono =
+    RideC
+-- Multi Velocity Kits
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    FullMixL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS FullMix)}) RightA =
+    FullMixR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    FullMixL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS FullMix)}) RightA =
+    FullMixR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ FullMix)}) LeftA =
+    FullMixL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ FullMix)}) RightA =
+    FullMixR
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS FullMix)}) LeftA =
+    TomL x
+determineChannel (Sample {saInstrument = Tom (RackTom x), saInstrumentProperties = (InstS FullMix)}) RightA =
+    TomR x
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS FullMix)}) LeftA =
+    FloorTomL x
+determineChannel (Sample {saInstrument = Tom (Floor x), saInstrumentProperties = (InstS FullMix)}) RightA =
+    FloorTomR x
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    RideL
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS FullMix)}) RightA =
+    RideR
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    OHL
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS FullMix)}) RightA =
+    OHR
+
+determineChannel (Sample {saInstrument = Tambourine, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    FullMixL
+determineChannel (Sample {saInstrument = Tambourine, saInstrumentProperties = (InstS FullMix)}) RightA =
+    FullMixR
+determineChannel (Sample {saInstrument = Shaker, saInstrumentProperties = (InstS FullMix)}) LeftA =
+    FullMixL
+determineChannel (Sample {saInstrument = Shaker, saInstrumentProperties = (InstS FullMix)}) RightA =
+    FullMixR
+
+--- for the modern folk kit
+
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room1)}) Mono =
+    Room1Mono
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room2)}) Mono =
+    Room2Mono
+
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Top)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Bottom)}) Mono =
+    SnareBottom
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Room1)}) Mono =
+    Room1Mono
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Room2)}) Mono =
+    Room2Mono
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Room1)}) Mono =
+    Room1Mono
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Room2)}) Mono =
+    Room2Mono
+
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Room1)}) Mono =
+    Room1Mono
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Room2)}) Mono =
+    Room2Mono
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Room1)}) Mono =
+    Room1Mono
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Room2)}) Mono =
+    Room2Mono
+
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Room1)}) Mono =
+    Room1Mono
+determineChannel (Sample {saInstrument = Tom (RackTom _), saInstrumentProperties = (InstS Room2)}) Mono =
+    Room2Mono
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Room1)}) Mono =
+    Room1Mono
+determineChannel (Sample {saInstrument = Tom (Floor _), saInstrumentProperties = (InstS Room2)}) Mono =
+    Room2Mono
+
+
+determineChannel sample channel = trace (printf "%s %s" (show sample) (show channel)) Undefined

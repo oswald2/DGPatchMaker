@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, BangPatterns #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns, RecordWildCards #-}
 module Data.DrumDrops.Utils
 
 where
@@ -9,7 +9,7 @@ import Prelude as P
 import System.Directory
 import System.FilePath
 import Data.List as L (sort, groupBy)
-import Data.Text (Text, pack, append)
+import Data.Text (Text, pack, unpack, append)
 
 import Data.Either
 import Data.Char (isSpace)
@@ -19,6 +19,7 @@ import qualified Data.DrumDrops.VintageFolkParser as VFP
 import qualified Data.DrumDrops.ModernFolkParser as MFP
 
 import Data.Types
+import Data.Drumgizmo
 
 import Sound.File.Sndfile (getFileInfo, Info(..))
 
@@ -43,7 +44,7 @@ importInstrument parserType basepath samplesPath path = do
     w <- getSamples parserType samplesPath path
     case w of
         Left err -> return (Left err)
-        Right wavFiles -> return (Right (convertSampleGroup basepath wavFiles))
+        Right wavFiles -> return (Right (convertSampleGroup parserType basepath wavFiles))
 
 
 
@@ -112,3 +113,65 @@ getSampleFromFileName MapexParser = MP.getSampleFromFileName
 getSampleFromFileName VintageFolkParser = VFP.getSampleFromFileName
 getSampleFromFileName ModernFolkParser = MFP.getSampleFromFileName
 
+
+
+determineChannel :: ParserType -> Sample -> Channel -> Microphones
+determineChannel parserType sample channel =
+    case parserType of
+        MapexParser -> MP.determineChannel sample channel
+        VintageFolkParser -> VFP.determineChannel sample channel
+        ModernFolkParser -> MFP.determineChannel sample channel
+
+
+convertSampleGroup :: ParserType -> FilePath -> SampleGroup -> InstrumentFile
+convertSampleGroup parserType basepath sg =
+    InstrumentFile dgDefaultVersion nm (sgInstrument sg) groups
+    where
+        nm = sgInstName sg
+        vname :: Int -> Text
+        vname i = nm `append` pack (show i)
+        groups = P.zipWith (\vg i -> convertVelocityGroup parserType (vname i) (sgPath sg) basepath vg) (sgGroups sg) [1..]
+
+
+
+convertVelocityGroup :: ParserType -> Text -> FilePath -> FilePath -> VelocityGroup -> HitSample
+convertVelocityGroup parserType name path basepath vg =
+    HitSample name (vgVelocity vg) files
+    where
+        files = sort (P.concatMap (convertSample parserType basepath path) (vgSamples vg))
+
+
+
+convertSample :: ParserType -> FilePath -> FilePath -> Sample -> [AudioFile]
+convertSample parserType basepath path x =
+    case saChannels x of
+        1 -> case saInstrumentProperties x of
+                InstS FullMix -> [AudioFile (determineChannel parserType x LeftA) (determinePath basepath path (saFileName x)) 1,
+                                  AudioFile (determineChannel parserType x RightA) (determinePath basepath path (saFileName x)) 1]
+                _ -> [AudioFile (determineChannel parserType x Mono) (determinePath basepath path (saFileName x)) 1]
+        2 -> [AudioFile (determineChannel parserType x LeftA) (determinePath basepath path (saFileName x)) 1,
+              AudioFile (determineChannel parserType x RightA) (determinePath basepath path (saFileName x)) 2]
+        _ -> []
+
+
+
+determinePath :: FilePath -> FilePath -> Text -> FilePath
+determinePath basepath path filename = "../../" </> makeRelative basepath path </> unpack filename
+
+
+
+
+getMaxVelocity :: SampleGroup -> Double
+getMaxVelocity (SampleGroup{..}) = P.maximum (P.map vgVelocity sgGroups)
+
+
+
+
+velocityGroup :: Sample -> Sample -> Bool
+velocityGroup x1 x2 =
+    let v = saVelocity x1 == saVelocity x2
+        rr (Just rr1) (Just rr2) = rr1 == rr2
+        rr _ _ = True
+        res = v && rr (saRound x1) (saRound x2)
+    in
+    res
