@@ -289,6 +289,12 @@ determineChannel (Sample {saInstrument = Tambourine, saInstrumentProperties = (I
 determineChannel (Sample {saInstrument = Shaker, saInstrumentProperties = (InstS Close)}) Mono =
     ShakerC
 
+--- for the modern folk kit
+
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room1)}) Mono =
+    Room1Mono
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Room2)}) Mono =
+    Room2Mono
 
 
 determineChannel sample channel = trace (printf "%s %s" (show sample) (show channel)) Undefined

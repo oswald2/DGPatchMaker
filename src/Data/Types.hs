@@ -68,11 +68,15 @@ data MicType =
     | Sub
     | Overhead
     | Room
+    | Room1
+    | Room2
     | FullMix
     | Kit1
     | Kit2
     | KickClose
     | SnareClose
+    | Top
+    | Bottom
     deriving (Show, Enum, Ord, Eq)
 
 data HiHatState =
@@ -88,6 +92,7 @@ data HiHatState =
     | HiHatBrushClosed
     | HiHatHotRodsOpen
     | HiHatHotRodsClosed
+    | HiHatUndefined
     deriving (Show, Enum, Ord, Eq)
 
 
@@ -160,6 +165,8 @@ data Microphones =
     | OHR
     | RoomL
     | RoomR
+    | Room1Mono
+    | Room2Mono
     | FullMixL
     | FullMixR
     | ShakerC
@@ -192,6 +199,8 @@ instance Show Microphones where
     show OHR =          "OHR"
     show RoomL =        "RoomL"
     show RoomR =        "RoomR"
+    show Room1Mono =    "Room1Mono"
+    show Room2Mono =    "Room2Mono"
     show FullMixL =     "FullMixL"
     show FullMixR =     "FullMixR"
     show ShakerC =      "ShakerC"
@@ -230,6 +239,8 @@ micToInt FullMixL = 77
 micToInt FullMixR = 78
 micToInt ShakerC = 79
 micToInt TambourineC = 80
+micToInt Room1Mono = 81
+micToInt Room2Mono = 82
 micToInt Undefined = 100
 
 
@@ -280,6 +291,8 @@ micParser = do
     <|> (try (string "OHR"          ) >> return OHR         )
     <|> (try (string "RoomL"        ) >> return RoomL       )
     <|> (try (string "RoomR"        ) >> return RoomR       )
+    <|> (try (string "Room1Mono"    ) >> return Room1Mono   )
+    <|> (try (string "Room2Mono"    ) >> return Room2Mono   )
     <|> (try (string "FullMixL"     ) >> return FullMixL    )
     <|> (try (string "FullMixR"     ) >> return FullMixR    )
     <|> (try (string "ShakerC"      ) >> return ShakerC     )
