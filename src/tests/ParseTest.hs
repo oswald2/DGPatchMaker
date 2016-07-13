@@ -48,7 +48,7 @@ main = do
                 Left err -> do
                     Prelude.putStrLn (show err)
                     exitFailure
-                Right x -> print x
+                Right sample -> print sample
 
 
 --printSample :: Sample -> IO ()

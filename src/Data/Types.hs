@@ -37,6 +37,8 @@ data Instrument =
     | Tom TomType
     | Cymbal
     | Ride
+    | Shaker
+    | Tambourine
     deriving (Show, Read, Eq)
 
 instance Ord Instrument where
@@ -51,6 +53,8 @@ toNumber HiHat = 3
 toNumber (Tom _) = 4
 toNumber Cymbal = 5
 toNumber Ride = 6
+toNumber Shaker = 7
+toNumber Tambourine = 8
 
 
 
@@ -80,6 +84,10 @@ data HiHatState =
     | HiHatOpen
     | HiHatPedalShut
     | HiHatPedalOpen
+    | HiHatBrushOpen
+    | HiHatBrushClosed
+    | HiHatHotRodsOpen
+    | HiHatHotRodsClosed
     deriving (Show, Enum, Ord, Eq)
 
 
@@ -154,6 +162,8 @@ data Microphones =
     | RoomR
     | FullMixL
     | FullMixR
+    | ShakerC
+    | TambourineC
     | Undefined
 
 
@@ -182,8 +192,10 @@ instance Show Microphones where
     show OHR =          "OHR"
     show RoomL =        "RoomL"
     show RoomR =        "RoomR"
-    show FullMixL =        "FullMixL"
-    show FullMixR =        "FullMixR"
+    show FullMixL =     "FullMixL"
+    show FullMixR =     "FullMixR"
+    show ShakerC =      "ShakerC"
+    show TambourineC =  "TambourineC"
     show Undefined =    "Undefined"
 
 instance Ord Microphones where
@@ -216,7 +228,10 @@ micToInt RoomL = 75
 micToInt RoomR = 76
 micToInt FullMixL = 77
 micToInt FullMixR = 78
+micToInt ShakerC = 79
+micToInt TambourineC = 80
 micToInt Undefined = 100
+
 
 instance Eq Microphones where
     x1 == x2 = (micToInt x1) == (micToInt x2)
@@ -267,6 +282,8 @@ micParser = do
     <|> (try (string "RoomR"        ) >> return RoomR       )
     <|> (try (string "FullMixL"     ) >> return FullMixL    )
     <|> (try (string "FullMixR"     ) >> return FullMixR    )
+    <|> (try (string "ShakerC"      ) >> return ShakerC     )
+    <|> (try (string "TambourineC"  ) >> return TambourineC )
     <|> return Undefined
 
 
@@ -331,7 +348,8 @@ getMidiNoteFromInstrument (Tom (Floor _)) = 43
 getMidiNoteFromInstrument (Tom (RackTom _)) = 45
 getMidiNoteFromInstrument Cymbal = 55
 getMidiNoteFromInstrument Ride = 51
-
+getMidiNoteFromInstrument Shaker = 48
+getMidiNoteFromInstrument Tambourine = 32
 
 
 midiNotes :: M.IntMap Text

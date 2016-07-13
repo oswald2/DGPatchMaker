@@ -15,6 +15,7 @@ import Data.Either
 import Data.Char (isSpace)
 import Data.DrumDrops.Types
 import qualified Data.DrumDrops.MapexKitParser as MP
+import qualified Data.DrumDrops.VintageFolkParser as VFP
 
 import Data.Types
 
@@ -24,7 +25,9 @@ import Text.Parsec (ParseError)
 
 
 
-data ParserType = MapexParser
+data ParserType =
+    MapexParser
+    | VintageFolkParser
     deriving (Enum, Eq, Ord, Show, Read)
 
 
@@ -104,3 +107,5 @@ pathToInstrument sampleDir path' =
 
 getSampleFromFileName :: ParserType -> FilePath -> Int -> Either ParseError Sample
 getSampleFromFileName MapexParser = MP.getSampleFromFileName
+getSampleFromFileName VintageFolkParser = VFP.getSampleFromFileName
+

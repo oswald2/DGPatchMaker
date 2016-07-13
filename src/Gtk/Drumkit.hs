@@ -184,7 +184,7 @@ initParserCombo cb = do
     void $ mapM (comboBoxAppendText cb) str
     comboBoxSetActive cb 0
     where
-        str = map (pack . show) [MapexParser]
+        str = map (pack . show) (enumFrom MapexParser)
 
 setBaseDir :: DrumkitPage -> IO ()
 setBaseDir mainWindow = do

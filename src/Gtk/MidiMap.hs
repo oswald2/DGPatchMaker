@@ -135,9 +135,13 @@ initTreeViewMM tv ls = do
 
     treeViewSetEnableSearch tv True
     treeViewSetSearchEqualFunc tv $ Just $ \str iter -> do
-        (i:_) <- treeModelGetPath ls iter
-        !row <- listStoreGetValue ls i
-        return $ toLower str `isPrefixOf` toLower (mmiInstrument row)
+        res <- treeModelGetPath ls iter
+        if (not (null res))
+            then do
+                let (i : _) = res
+                !row <- listStoreGetValue ls i
+                return $ toLower str `isInfixOf` toLower (mmiInstrument row)
+            else return False
 
     treeSortableSetSortFunc sortModel sort0 $ \iter1 iter2 -> do
         m1 <- treeModelGetRow ls iter1

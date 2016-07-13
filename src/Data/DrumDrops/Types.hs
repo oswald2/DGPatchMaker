@@ -22,7 +22,8 @@ import Data.List (sort)
 
 import System.FilePath
 
-
+import Debug.Trace
+import Text.Printf
 
 
 -- data type for the samples
@@ -220,7 +221,77 @@ determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS
     OHL
 determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS FullMix)}) RightA =
     OHR
-determineChannel _ _ = Undefined
+
+-- For the vintage folk kit
+
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS KickClose)}) Mono =
+    KickC
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS SnareClose)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Kit1)}) Mono =
+    RoomL
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Kit2)}) Mono =
+    RoomR
+determineChannel (Sample {saInstrument = Kick, saInstrumentProperties = (InstS Overhead)}) Mono =
+    OHL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS KickClose)}) Mono =
+    KickC
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS SnareClose)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Kit1)}) Mono =
+    RoomL
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Kit2)}) Mono =
+    RoomR
+determineChannel (Sample {saInstrument = Snare, saInstrumentProperties = (InstS Overhead)}) Mono =
+    OHL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ KickClose)}) Mono =
+    KickC
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ SnareClose)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Kit1)}) Mono =
+    RoomL
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Kit2)}) Mono =
+    RoomR
+determineChannel (Sample {saInstrument = HiHat, saInstrumentProperties = (HiHatS _ Overhead)}) Mono =
+    OHL
+determineChannel (Sample {saInstrument = Tom _, saInstrumentProperties = (InstS KickClose)}) Mono =
+    KickC
+determineChannel (Sample {saInstrument = Tom _, saInstrumentProperties = (InstS SnareClose)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = Tom _, saInstrumentProperties = (InstS Kit1)}) Mono =
+    RoomL
+determineChannel (Sample {saInstrument = Tom _, saInstrumentProperties = (InstS Kit2)}) Mono =
+    RoomR
+determineChannel (Sample {saInstrument = Tom _, saInstrumentProperties = (InstS Overhead)}) Mono =
+    OHL
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS KickClose)}) Mono =
+    KickC
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS SnareClose)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Kit1)}) Mono =
+    RoomL
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Kit2)}) Mono =
+    RoomR
+determineChannel (Sample {saInstrument = Cymbal, saInstrumentProperties = (InstS Overhead)}) Mono =
+    OHL
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS KickClose)}) Mono =
+    KickC
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS SnareClose)}) Mono =
+    SnareTop
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Kit1)}) Mono =
+    RoomL
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Kit2)}) Mono =
+    RoomR
+determineChannel (Sample {saInstrument = Ride, saInstrumentProperties = (InstS Overhead)}) Mono =
+    OHL
+determineChannel (Sample {saInstrument = Tambourine, saInstrumentProperties = (InstS Close)}) Mono =
+    TambourineC
+determineChannel (Sample {saInstrument = Shaker, saInstrumentProperties = (InstS Close)}) Mono =
+    ShakerC
+
+
+
+determineChannel sample channel = trace (printf "%s %s" (show sample) (show channel)) Undefined
 
 
 determinePath :: FilePath -> FilePath -> Text -> FilePath
