@@ -39,26 +39,59 @@ sampleParser fname nChannels = do
         "SHKR" -> shakerParser fname nChannels
         "TAM1" -> tambourineParser fname nChannels
         "TAM" -> tambourineParser fname nChannels
-        _ -> do
-            void $ char '_'
-            inst <- instrument
-            void $ char '_'
-            st <- case inst of
-                HiHat -> hiHat
-                _ -> instState
-            void $ char '_'
-            kitNumber
-            void $ char '_'
-            v <- velocity
+        "GR10" -> generalParserWithTom fname nChannels maker' 1
+        "GR12" -> generalParserWithTom fname nChannels maker' 2
+        "GR13" -> generalParserWithTom fname nChannels maker' 3
+        _ -> generalParser fname nChannels maker'
 
-            rr <- roundRobin
 
-            let
-                maker = pack maker'
-                res =
-                    Sample fname maker inst st v rr nChannels
 
-            return res
+generalParser :: Text -> Word -> String -> Parsec Text u Sample
+generalParser fname nChannels maker' = do
+    void $ char '_'
+    inst <- instrument 0
+    void $ char '_'
+    st <- case inst of
+        HiHat -> hiHat
+        _ -> instState
+    void $ char '_'
+    kitNumber
+    void $ char '_'
+    v <- velocity
+
+    rr <- roundRobin
+
+    let
+        maker = pack maker'
+        res =
+            Sample fname maker inst st v rr nChannels
+
+    return res
+
+
+generalParserWithTom :: Text -> Word -> String -> Int -> Parsec Text u Sample
+generalParserWithTom fname nChannels maker' tomNr = do
+    void $ char '_'
+    inst <- instrument tomNr
+    void $ char '_'
+    st <- case inst of
+        HiHat -> hiHat
+        _ -> instState
+    void $ char '_'
+    kitNumber
+    void $ char '_'
+    v <- velocity
+
+    rr <- roundRobin
+
+    let
+        maker = pack maker'
+        res =
+            Sample fname maker inst st v rr nChannels
+
+    return res
+
+
 
 shakerParser :: Text -> Word -> Parsec Text u Sample
 shakerParser fname nChannels = do
@@ -84,31 +117,38 @@ tambourineParser fname nChannels = do
 
 
 
-instrument :: Parsec Text u Instrument
-instrument = do
+instrument :: Int -> Parsec Text u Instrument
+instrument tomNr = do
     (try (string "SNR") >> return Snare)
     <|> (try (string "SN") >> return Snare)
     <|> (try (string "KICK") >> return Kick)
     <|> (try (string "KK") >> return Kick)
     <|> (try (string "HAT") >> return HiHat)
     <|> (try (string "HH") >> return HiHat)
-    <|> try toms
+    <|> try (toms tomNr)
     <|> (try (string "CRSH") >> return Cymbal)
     <|> (try (string "CRS") >> return Cymbal)
     <|> (try (string "RIDE") >> return Ride)
     <|> (try (string "RD") >> return Ride)
 
 
-toms :: Parsec Text u Instrument
-toms = do
-    t <- try $ do
+toms :: Int -> Parsec Text u Instrument
+toms tomNr = do
+    t <- try racktom
+        <|> try racktomN
+        <|> try floorTom
+    return (Tom t)
+    where
+        racktom = do
+            void $ try (string "RKTM")
+            return (RackTom tomNr)
+        racktomN = do
             void $ try (string "RTM") <|> string "RT"
             n <- digit
             return (RackTom (read [n]))
-        <|> do
+        floorTom = do
             void $ try (string "FLTM") <|> string "FTM"
             return (Floor 1)
-    return (Tom t)
 
 
 micType :: Parsec Text u MicType
