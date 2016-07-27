@@ -16,19 +16,6 @@
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <child>
-              <object class="GtkButton" id="buttonOpenSamples">
-                <property name="label" translatable="yes">Open Samples...</property>
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">True</property>
-              </object>
-              <packing>
-                <property name="expand">True</property>
-                <property name="fill">True</property>
-                <property name="position">0</property>
-              </packing>
-            </child>
-            <child>
               <object class="GtkButton" id="buttonImportInstrument">
                 <property name="label" translatable="yes">Import DrumDrops Instrument...	</property>
                 <property name="visible">True</property>
@@ -39,7 +26,7 @@
               <packing>
                 <property name="expand">True</property>
                 <property name="fill">True</property>
-                <property name="position">1</property>
+                <property name="position">0</property>
               </packing>
             </child>
           </object>
@@ -194,6 +181,7 @@
                                 <property name="search_column">3</property>
                                 <property name="show_expanders">False</property>
                                 <property name="enable_grid_lines">horizontal</property>
+                                <property name="activate_on_single_click">True</property>
                                 <child internal-child="selection">
                                   <object class="GtkTreeSelection" id="treeview-selection1"/>
                                 </child>
@@ -312,6 +300,28 @@
         <property name="visible">True</property>
         <property name="can_focus">False</property>
         <property name="label" translatable="yes">Remove Sample</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+  </object>
+  <object class="GtkMenu" id="menuHits">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <child>
+      <object class="GtkMenuItem" id="menuitemAddHitSample">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Adds a new Hit in this Instrument</property>
+        <property name="label" translatable="yes">Add Hit</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="menuitemRemoveHitSample">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Removed the selected Hit from the Instrument</property>
+        <property name="label" translatable="yes">Remove Hit</property>
         <property name="use_underline">True</property>
       </object>
     </child>

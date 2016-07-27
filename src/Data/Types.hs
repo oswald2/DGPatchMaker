@@ -6,6 +6,7 @@ where
 import Control.Monad (void)
 import Data.Text
 import Data.Set as S
+import Data.List as L ((\\))
 import System.FilePath
 import Text.Parsec as P
 import Data.List (sortOn)
@@ -379,5 +380,8 @@ midiNotes = M.fromList (Prelude.zip midi finalNotes)
 midiToNote :: Int -> Text
 midiToNote x = maybe "--" id $ M.lookup x midiNotes
 
+
+removeSamples :: HitSample -> [AudioFile] -> HitSample
+removeSamples hs samples = hs { hsSamples = hsSamples hs L.\\ samples }
 
 

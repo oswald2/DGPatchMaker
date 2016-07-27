@@ -321,11 +321,11 @@ importDrumDropsDrumKit' gui = do
             return instruments
 
         doSingleImport progress basedir samplesDir step path = do
-            ins <- newInstrumentPage (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
+            ins <- instrumentPageNew (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
                 (guiBaseDir gui) (guiSamplesDir gui) (guiParserCombo gui) (guiDkInstrumentPages gui)
             let instName = pathToInstrument samplesDir path
-            _ <- notebookAppendPage (guiDkInstrumentsNotebook gui) (getMainBox ins) instName
-            insertInstrumentPage ins
+            _ <- notebookAppendPage (guiDkInstrumentsNotebook gui) (instrumentPageGetMainBox ins) instName
+            instrumentPageInsert ins
 
             pt <- comboBoxGetActiveText (guiParserCombo gui)
             let parserType = maybe MapexParser (read . unpack) pt
@@ -336,7 +336,7 @@ importDrumDropsDrumKit' gui = do
                     displayErrorBox (guiDkParentWindow gui) err
                     return (Left err)
                 Right instFile -> do
-                    setInstrumentFile ins instFile
+                    instrumentPageSetInstrumentFile ins instFile
 
                     -- update the progress bar
                     frac <- progressBarGetFraction progress
@@ -560,7 +560,7 @@ writeDrumKitFile' gui nm basepath = do
 exportInstruments :: DrumkitPage -> IO ()
 exportInstruments gui = do
     v <- readIORef (guiDkInstrumentPages gui)
-    vres <- V.forM v writeInstrumentFile
+    vres <- V.forM v instrumentPageWriteInstrumentFile
 
     if V.any isLeft vres
         then do
@@ -581,7 +581,7 @@ resetDrumkit gui = do
     writeIORef (guiDrumkit gui) Nothing
 
     v <- readIORef (guiDkInstrumentPages gui)
-    V.mapM_ resetInstrumentPage v
+    V.mapM_ instrumentPageReset v
     writeIORef (guiDkInstrumentPages gui) empty
 
     resetMidiMap (guiMidiMapGM gui)

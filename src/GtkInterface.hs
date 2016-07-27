@@ -64,10 +64,12 @@ initMainWindow = do
     --insertInstrumentPage inst
 
     void $ on buttonNewInstrument buttonActivated $ do
-        ins <- newInstrumentPage window notebookInstruments entryBaseDirectory entrySamplesDir combo instPages
-        i <- notebookAppendPage notebookInstruments (getMainBox ins) ("Instrument 1" :: Text)
-        insertInstrumentPage ins
+        let name = "NewInstrument" :: Text
+        ins <- instrumentPageNew window notebookInstruments entryBaseDirectory entrySamplesDir combo instPages
+        i <- notebookAppendPage notebookInstruments (instrumentPageGetMainBox ins) name
+        instrumentPageInsert ins
         notebookSetCurrentPage notebookInstruments i
+        instrumentPageSetInstrumentName ins name
 
     -- set termination
     void $ window `on` deleteEvent $ liftIO quit
