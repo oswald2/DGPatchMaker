@@ -38,6 +38,7 @@ import Data.Export
 import Data.Maybe
 import Data.Char (isSpace)
 import Data.Either
+import Data.List as L (intercalate)
 import qualified Data.Vector as V
 
 import Data.DrumDrops.Utils
@@ -45,6 +46,8 @@ import Data.DrumDrops.Utils
 import System.FilePath
 
 import Gtk.InstrumentPageBuilder
+
+import Network.URI (unEscapeString)
 
 import Sound.File.Sndfile (getFileInfo, Info(..))
 
@@ -106,12 +109,23 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
     menuAddHitSample <- builderGetObject builder castToMenuItem ("menuitemAddHitSample" :: Text)
     menuRemoveHitSample <- builderGetObject builder castToMenuItem ("menuitemRemoveHitSample" :: Text)
 
+    -- create a tag that we use as selection, target and selection type
+    sampleTypeTag <- atomNew ("_SampleType" :: Text)
+
 
     hsls <- listStoreNew []
     (rendererHPName, rendererHP) <- initTreeViewHit treeviewHit hsls
 
+    --sals <- listStoreNewDND []
+        --(Just DragSourceIface {
+            --treeDragSourceRowDraggable = \_ _ -> return True,
+            --treeDragSourceDragDataGet = dragSamplesAction gui sampleTypeTag,
+            --treeDragSourceDragDataDelete = \_ _ -> return True
+        --})
+        --Nothing
     sals <- listStoreNew []
-    (rendChan, rendFileChan) <- initTreeViewSamples treeviewSamples sals
+
+    (rendChan, rendFileChan) <- initTreeViewSamples treeviewSamples sals sampleTypeTag
 
     ifr <- newIORef Nothing
 
@@ -157,8 +171,10 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
     void $ on menuAddHitSample menuItemActivate (addHitPower gui)
     void $ on menuRemoveHitSample menuItemActivate (removeHitPower gui)
 
-    void $ on treeviewSamples dragDrop $ dragDropSignal gui
     void $ on treeviewSamples dragDataReceived $ dragDataReceivedSignal gui
+    void $ on treeviewSamples dragDataGet $ dragDataGetSignal gui
+
+    void $ on treeviewHit dragDataReceived $ dragDataReceivedSignalHit gui
 
     -- setup the local callbacks for the treeviews
     setupCallbacks gui
@@ -166,46 +182,72 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
     return gui
 
 
-dragDropSignal :: InstrumentPage -> DragContext -> Point -> TimeStamp -> IO Bool
-dragDropSignal gui dragContext _ timestamp = do
-    liftIO $ T.putStrLn "dragDrop called!"
-    dragGetData (guiInstSamplesView gui) dragContext targetString timestamp
-    return True
+
 
 
 
 dragDataReceivedSignal :: InstrumentPage -> DragContext -> Point -> InfoId -> TimeStamp -> SelectionDataM ()
 dragDataReceivedSignal gui dragContext _ _ timestamp = do
-    txt <- selectionDataGetText
+    txt <- selectionDataGetURIs
     liftIO $ do
-        T.putStrLn "dragDataReceivedSignal called!"
+        P.putStrLn $"dragDataReceivedSignal called: " ++ show txt
+
         maybe (return ()) (dropAction gui) txt
 
         dragFinish dragContext True False timestamp
+    return ()
+
+dragDataReceivedSignalHit :: InstrumentPage -> DragContext -> Point -> InfoId -> TimeStamp -> SelectionDataM ()
+dragDataReceivedSignalHit gui dragContext _ _ timestamp = do
+    txt <- selectionDataGetText
+    liftIO $ do
+        T.putStrLn "dragDataReceivedSignalHit called!"
+        maybe (return ()) (dropActionHit gui) txt
+
+        dragFinish dragContext True False timestamp
+    return ()
+
+
+dragDataGetSignal :: InstrumentPage -> DragContext -> InfoId -> TimeStamp -> SelectionDataM ()
+dragDataGetSignal gui _ _ _ = do
+    r <- liftIO $ do
+        T.putStrLn "Drag-Data-Get called"
+        sel <- treeViewGetSelection (guiInstSamplesView gui)
+        rows <- treeSelectionGetSelectedRows sel
+        return (P.concat rows)
+
+    selectionDataSet selectionTypeInteger r
     return ()
 
 
 -- called when a drag and drop was done. The data of the drag and
 -- drop is in the Text argument which is a list of filenames in
 -- this case
-dropAction :: InstrumentPage -> Text -> IO ()
+dropAction :: InstrumentPage -> [Text] -> IO ()
 dropAction gui x = do
-    case checkFileNames x of
-        Left err -> displayErrorBox (guiMainWindow gui) err
-        Right lst -> do
+    T.putStrLn "dropAction"
+    let res = P.map checkFileNames x
+    case (not.P.null.lefts) res of
+        True -> displayErrorBox (guiMainWindow gui) ("Errors: " `append` (T.intercalate "\n" (lefts res)))
+        False -> do
             basepath <- entryGetText (guiIPEntryBaseDir gui)
-            af <- getAudioSamplesFromFiles (unpack basepath) lst
+            af <- getAudioSamplesFromFiles (unpack basepath) (rights res)
 
             let ls = guiInstSamplesViewModel gui
 
             mapM_ (listStoreAppend ls) af
 
-            return ()
+
+dropActionHit :: InstrumentPage -> Text -> IO ()
+dropActionHit gui x = do
+    T.putStrLn "dropActionHit called"
+    return ()
 
 
-checkFileNames :: Text -> Either Text [FilePath]
+
+checkFileNames :: Text -> Either Text FilePath
 checkFileNames =
-    conv . P.map chk . T.lines
+    chk
     where
         chk :: Text -> Either Text FilePath
         chk x =
@@ -216,7 +258,7 @@ checkFileNames =
                 file = P.filter (/= '\r') x'
             in
             if (takeExtension file) == ".wav"
-                then Right file
+                then Right (unEscapeString file)
                 else Left $ "Illegal file: " `T.append` (T.pack file)
         conv :: [Either Text FilePath] -> Either Text [FilePath]
         conv xs =
@@ -338,6 +380,11 @@ initTreeViewHit tv ls = do
         row <- listStoreGetValue ls i
         return $ toLower str `T.isPrefixOf` toLower (hsName row)
 
+    tls <- targetListNew
+    targetListAdd tls targetString [TargetSameApp] dndInfoId
+    treeViewEnableModelDragDest tv tls [ActionMove]
+
+
     return (renderer1, rendererHP)
 
 
@@ -345,8 +392,8 @@ initTreeViewHit tv ls = do
 
 
 
-initTreeViewSamples :: TreeView -> ListStore AudioFile -> IO (CellRendererText, CellRendererText)
-initTreeViewSamples tv ls = do
+initTreeViewSamples :: TreeView -> ListStore AudioFile -> TargetTag -> IO (CellRendererText, CellRendererText)
+initTreeViewSamples tv ls sampleTypeTag = do
     treeViewSetModel tv ls
 
     treeViewSetHeadersVisible tv True
@@ -388,20 +435,29 @@ initTreeViewSamples tv ls = do
     _ <- treeViewAppendColumn tv col2
     _ <- treeViewAppendColumn tv col3
 
+    -- enable multiple selection mode
+    sel <- treeViewGetSelection tv
+    treeSelectionSetMode sel SelectionMultiple
+
+    -- set the search function
     treeViewSetEnableSearch tv True
     treeViewSetSearchEqualFunc tv $ Just $ \str iter -> do
         (i:_) <- treeModelGetPath ls iter
         row <- listStoreGetValue ls i
         return $ toLower str `T.isPrefixOf` toLower (pack (afPath row))
 
+
+    -- enable drag and drop
     tls <- targetListNew
-    T.putStrLn "Enabling DnD..."
-    targetListAdd tls targetString [TargetOtherApp] dndInfoId
+    targetListAddUriTargets tls 2
+    targetListAddTextTargets tls 1
+    --targetListAdd tls targetString [TargetOtherApp] 1
     treeViewEnableModelDragDest tv tls [ActionCopy]
 
-    -- enable multiple selection mode
-    sel <- treeViewGetSelection tv
-    treeSelectionSetMode sel SelectionMultiple
+    tls1 <- targetListNew
+    targetListAdd tls1 sampleTypeTag [TargetSameApp] dndDragId
+    treeViewEnableModelDragSource tv [Button1] tls1 [ActionCopy]
+
 
     return (renderer1, renderer3)
 
@@ -409,6 +465,8 @@ initTreeViewSamples tv ls = do
 dndInfoId :: InfoId
 dndInfoId = 1
 
+dndDragId :: InfoId
+dndDragId = 2
 
 
 setCurrentNotebookLabel :: InstrumentPage -> Text -> IO ()

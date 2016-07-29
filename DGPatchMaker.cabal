@@ -76,6 +76,7 @@ executable DGPatchMaker
                        xml-conduit,
                        xml-types,
                        conduit-combinators,
+                       network-uri,
                        gtk3
 
   ghc-options: -O2 -Wall -rtsopts
