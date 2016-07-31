@@ -114,17 +114,9 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
 
 
     hsls <- listStoreNew []
-    (rendererHPName, rendererHP) <- initTreeViewHit treeviewHit hsls
+    (rendererHPName, rendererHP) <- initTreeViewHit treeviewHit hsls sampleTypeTag
 
-    --sals <- listStoreNewDND []
-        --(Just DragSourceIface {
-            --treeDragSourceRowDraggable = \_ _ -> return True,
-            --treeDragSourceDragDataGet = dragSamplesAction gui sampleTypeTag,
-            --treeDragSourceDragDataDelete = \_ _ -> return True
-        --})
-        --Nothing
     sals <- listStoreNew []
-
     (rendChan, rendFileChan) <- initTreeViewSamples treeviewSamples sals sampleTypeTag
 
     ifr <- newIORef Nothing
@@ -190,19 +182,16 @@ dragDataReceivedSignal :: InstrumentPage -> DragContext -> Point -> InfoId -> Ti
 dragDataReceivedSignal gui dragContext _ _ timestamp = do
     txt <- selectionDataGetURIs
     liftIO $ do
-        P.putStrLn $"dragDataReceivedSignal called: " ++ show txt
-
         maybe (return ()) (dropAction gui) txt
-
         dragFinish dragContext True False timestamp
     return ()
 
 dragDataReceivedSignalHit :: InstrumentPage -> DragContext -> Point -> InfoId -> TimeStamp -> SelectionDataM ()
-dragDataReceivedSignalHit gui dragContext _ _ timestamp = do
+dragDataReceivedSignalHit gui dragContext point _ timestamp = do
     txt <- selectionDataGetText
     liftIO $ do
         T.putStrLn "dragDataReceivedSignalHit called!"
-        maybe (return ()) (dropActionHit gui) txt
+        maybe (return ()) (dropActionHit gui point) txt
 
         dragFinish dragContext True False timestamp
     return ()
@@ -214,9 +203,11 @@ dragDataGetSignal gui _ _ _ = do
         T.putStrLn "Drag-Data-Get called"
         sel <- treeViewGetSelection (guiInstSamplesView gui)
         rows <- treeSelectionGetSelectedRows sel
-        return (P.concat rows)
+        let ls = guiInstSamplesViewModel gui
+        mapM (listStoreGetValue ls) (P.concat rows)
 
-    selectionDataSet selectionTypeInteger r
+    done <- selectionDataSetText (show r)
+    liftIO $ if done then T.putStrLn "Done." else T.putStrLn "Not done."
     return ()
 
 
@@ -225,7 +216,6 @@ dragDataGetSignal gui _ _ _ = do
 -- this case
 dropAction :: InstrumentPage -> [Text] -> IO ()
 dropAction gui x = do
-    T.putStrLn "dropAction"
     let res = P.map checkFileNames x
     case (not.P.null.lefts) res of
         True -> displayErrorBox (guiMainWindow gui) ("Errors: " `append` (T.intercalate "\n" (lefts res)))
@@ -238,9 +228,29 @@ dropAction gui x = do
             mapM_ (listStoreAppend ls) af
 
 
-dropActionHit :: InstrumentPage -> Text -> IO ()
-dropActionHit gui x = do
-    T.putStrLn "dropActionHit called"
+dropActionHit :: InstrumentPage -> Point -> Text -> IO ()
+dropActionHit gui point txt = do
+    T.putStrLn $ "dropActionHit called: " `append` txt
+
+    -- get the drag and drop data from text into data
+    let afs :: [AudioFile]
+        afs = read (unpack txt)
+
+    -- check, if we are with the mouse pointer over a hit sample
+    let tv = guiInstHitView gui
+
+    P.putStrLn $ "Point: " ++ show point
+
+    res <- treeViewGetPathAtPos tv point
+
+    case res of
+        Nothing -> do
+            T.putStrLn "Nothing"
+            return ()
+        Just (path, _, _) -> do
+            T.putStrLn $ "Path: " `append` pack (show path)
+
+
     return ()
 
 
@@ -260,11 +270,6 @@ checkFileNames =
             if (takeExtension file) == ".wav"
                 then Right (unEscapeString file)
                 else Left $ "Illegal file: " `T.append` (T.pack file)
-        conv :: [Either Text FilePath] -> Either Text [FilePath]
-        conv xs =
-            let lef = lefts xs
-            in
-            if P.null lef then Right (rights xs) else Left (T.unlines lef)
 
 
 getAudioSamplesFromFiles :: FilePath -> [FilePath] -> IO [AudioFile]
@@ -339,8 +344,8 @@ instrumentPageGetMainBox :: InstrumentPage -> Box
 instrumentPageGetMainBox = guiInstMainBox
 
 
-initTreeViewHit :: TreeView -> ListStore HitSample -> IO (CellRendererText, CellRendererText)
-initTreeViewHit tv ls = do
+initTreeViewHit :: TreeView -> ListStore HitSample -> TargetTag  -> IO (CellRendererText, CellRendererText)
+initTreeViewHit tv ls sampleTypeTag = do
     treeViewSetModel tv ls
 
     treeViewSetHeadersVisible tv True
@@ -381,9 +386,8 @@ initTreeViewHit tv ls = do
         return $ toLower str `T.isPrefixOf` toLower (hsName row)
 
     tls <- targetListNew
-    targetListAdd tls targetString [TargetSameApp] dndInfoId
-    treeViewEnableModelDragDest tv tls [ActionMove]
-
+    targetListAddTextTargets tls dndDragId
+    treeViewEnableModelDragDest tv tls [ActionCopy]
 
     return (renderer1, rendererHP)
 
@@ -427,7 +431,7 @@ initTreeViewSamples tv ls sampleTypeTag = do
                     ]
 
 
-    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := pack (show (afChannel hs))]
+    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := pack (showMic (afChannel hs))]
     cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := afPath hs ]
     cellLayoutSetAttributes col3 renderer3 ls $ \hs -> [ cellText := pack (show (afFileChannel hs)) ]
 
@@ -455,7 +459,7 @@ initTreeViewSamples tv ls sampleTypeTag = do
     treeViewEnableModelDragDest tv tls [ActionCopy]
 
     tls1 <- targetListNew
-    targetListAdd tls1 sampleTypeTag [TargetSameApp] dndDragId
+    targetListAddTextTargets tls1 dndDragId
     treeViewEnableModelDragSource tv [Button1] tls1 [ActionCopy]
 
 

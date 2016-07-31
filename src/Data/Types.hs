@@ -135,7 +135,7 @@ data AudioFile = AudioFile {
     afChannel:: !Microphones,
     afPath :: !FilePath,
     afFileChannel :: !Word
-} deriving (Show, Eq)
+} deriving (Show, Read, Eq)
 
 instance Ord AudioFile where
     compare x1 x2 = compare (afChannel x1) (afChannel x2)
@@ -173,40 +173,44 @@ data Microphones =
     | ShakerC
     | TambourineC
     | Undefined
+    deriving (Show, Read)
 
 
-instance Show Microphones where
-    show KickC =        "KickC"
-    show KickL =        "KickL"
-    show KickR =        "KickR"
-    show KickS =        "KickS"
-    show SnareTop =     "SnareTop"
-    show SnareBottom =  "SnareBottom"
-    show SnareL =       "SnareL"
-    show SnareR =       "SnareR"
-    show HiHatC =       "HiHatC"
-    show HiHatL =       "HiHatL"
-    show HiHatR =       "HiHatR"
-    show (TomC x) =     "TomC" ++ show x
-    show (TomL x) =     "TomL" ++ show x
-    show (TomR x) =     "TomR" ++ show x
-    show (FloorTomC x) =     "FloorTomC" ++ show x
-    show (FloorTomL x) =     "FloorTomL" ++ show x
-    show (FloorTomR x) =     "FloorTomR" ++ show x
-    show (RideC) =      "RideC"
-    show (RideL) =      "RideL"
-    show (RideR) =      "RideR"
-    show OHL =          "OHL"
-    show OHR =          "OHR"
-    show RoomL =        "RoomL"
-    show RoomR =        "RoomR"
-    show Room1Mono =    "Room1Mono"
-    show Room2Mono =    "Room2Mono"
-    show FullMixL =     "FullMixL"
-    show FullMixR =     "FullMixR"
-    show ShakerC =      "ShakerC"
-    show TambourineC =  "TambourineC"
-    show Undefined =    "Undefined"
+showMic :: Microphones -> String
+showMic KickC =        "KickC"
+showMic KickL =        "KickL"
+showMic KickR =        "KickR"
+showMic KickS =        "KickS"
+showMic SnareTop =     "SnareTop"
+showMic SnareBottom =  "SnareBottom"
+showMic SnareL =       "SnareL"
+showMic SnareR =       "SnareR"
+showMic HiHatC =       "HiHatC"
+showMic HiHatL =       "HiHatL"
+showMic HiHatR =       "HiHatR"
+showMic (TomC x) =     "TomC" ++ show x
+showMic (TomL x) =     "TomL" ++ show x
+showMic (TomR x) =     "TomR" ++ show x
+showMic (FloorTomC x) =     "FloorTomC" ++ show x
+showMic (FloorTomL x) =     "FloorTomL" ++ show x
+showMic (FloorTomR x) =     "FloorTomR" ++ show x
+showMic (RideC) =      "RideC"
+showMic (RideL) =      "RideL"
+showMic (RideR) =      "RideR"
+showMic OHL =          "OHL"
+showMic OHR =          "OHR"
+showMic RoomL =        "RoomL"
+showMic RoomR =        "RoomR"
+showMic Room1Mono =    "Room1Mono"
+showMic Room2Mono =    "Room2Mono"
+showMic FullMixL =     "FullMixL"
+showMic FullMixR =     "FullMixR"
+showMic ShakerC =      "ShakerC"
+showMic TambourineC =  "TambourineC"
+showMic Undefined =    "Undefined"
+
+
+
 
 instance Ord Microphones where
     compare x1 x2 = compare (micToInt x1) (micToInt x2)
@@ -326,7 +330,7 @@ instrumentFileToChannelMap ifl =
         grp | ifType ifl == HiHat = Just "hihat"
             | otherwise = Nothing
         chans' = getAvailableChannelsIF ifl S.empty
-        chans = Prelude.map (\x -> (x, x)) . Prelude.map (pack . show) $ toAscList chans'
+        chans = Prelude.map (\x -> (x, x)) . Prelude.map (pack . showMic) $ toAscList chans'
 
 
 
