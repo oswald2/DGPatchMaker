@@ -6,6 +6,8 @@ where
 
 import ClassyPrelude
 
+import Prelude (read)
+
 --import Control.Monad (void)
 --import Control.Exception
 
@@ -20,7 +22,7 @@ import Data.Drumgizmo
 --import Data.Import
 import Data.Either
 
-import qualified Data.ByteString.Lazy as B
+--import qualified Data.ByteString.Lazy as B
 
 import qualified Data.Vector as V
 
@@ -58,7 +60,8 @@ data DrumkitPage = DrumkitPage {
     guiDkInstrumentPages :: IORef (Vector InstrumentPage),
     guiErrDiag :: ErrorDialog,
     guiMidiMapGM :: MidiMapPage,
-    guiMidiMapDef :: MidiMapPage
+    guiMidiMapDef :: MidiMapPage,
+    guiParserCombo :: ComboBox
 }
 
 
@@ -66,11 +69,12 @@ initDrumkitPage :: Window ->
                     G.Builder ->
                     Notebook ->
                     ProgressBar ->
+                    ComboBox ->
                     Entry ->
                     Entry ->
                     IORef (Vector InstrumentPage) ->
                     IO DrumkitPage
-initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirectory entrySamplesDir ioref = do
+initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir ioref = do
 
     buttonImportDrumkit <- builderGetObject builder castToButton ("buttonImportDrumkit" :: Text)
     buttonExportDrumkit <- builderGetObject builder castToButton ("buttonExportDrumkit" :: Text)
@@ -115,6 +119,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
     midiMapGm <- initMidiMap mainWindow tvMidiGM entryBaseDirectory gmLoadButton gmExportButton
     midiMapDef <- initMidiMap mainWindow tvMidiDef entryBaseDirectory defLoadButton defExportButton
 
+    initParserCombo combo
+
     let gui = DrumkitPage{
             guiDkParentWindow = mainWindow,
             guiTvChannels = tvChannels,
@@ -136,7 +142,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress entryBaseDirecto
             guiErrDiag = errDiag,
             guiDkInstrumentPages = ioref,
             guiMidiMapGM = midiMapGm,
-            guiMidiMapDef = midiMapDef
+            guiMidiMapDef = midiMapDef,
+            guiParserCombo = combo
         }
 
     setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
@@ -171,7 +178,13 @@ setDkDescription dkp desc = do
     buffer <- textViewGetBuffer (guiDkDescription dkp)
     textBufferSetText buffer desc
 
-
+initParserCombo :: ComboBox -> IO ()
+initParserCombo cb = do
+    void $ comboBoxSetModelText cb
+    void $ mapM (comboBoxAppendText cb) str
+    comboBoxSetActive cb 0
+    where
+        str = map (pack . show) (enumFrom MapexParser)
 
 setBaseDir :: DrumkitPage -> IO ()
 setBaseDir mainWindow = do
@@ -184,6 +197,9 @@ setBaseDir mainWindow = do
                ,ResponseCancel)
               ,("gtk-open"
                , ResponseAccept)]
+
+    basepath <- entryGetText (guiBaseDir mainWindow)
+    void $ fileChooserSetFilename dialog basepath
 
     widgetShow dialog
     resp <- dialogRun dialog
@@ -238,8 +254,10 @@ setSamplesDir mainWindow = do
 
 importDrumDropsDrumKit :: DrumkitPage -> IO ()
 importDrumDropsDrumKit gui = do
+    widgetSetSensitive (guiParserCombo gui) False
     catch (importDrumDropsDrumKit' gui)
         (\e -> displayErrorBox (guiDkParentWindow gui) ("Error: " <> pack (show (e :: SomeException))))
+    widgetSetSensitive (guiParserCombo gui) True
 
 
 
@@ -303,19 +321,22 @@ importDrumDropsDrumKit' gui = do
             return instruments
 
         doSingleImport progress basedir samplesDir step path = do
-            ins <- newInstrumentPage (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
-                (guiBaseDir gui) (guiSamplesDir gui) (guiDkInstrumentPages gui)
+            ins <- instrumentPageNew (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
+                (guiBaseDir gui) (guiSamplesDir gui) (guiParserCombo gui) (guiDkInstrumentPages gui)
             let instName = pathToInstrument samplesDir path
-            _ <- notebookAppendPage (guiDkInstrumentsNotebook gui) (getMainBox ins) instName
-            insertInstrumentPage ins
+            _ <- notebookAppendPage (guiDkInstrumentsNotebook gui) (instrumentPageGetMainBox ins) instName
+            instrumentPageInsert ins
 
-            res <- importInstrument basedir samplesDir path
+            pt <- comboBoxGetActiveText (guiParserCombo gui)
+            let parserType = maybe MapexParser (read . unpack) pt
+
+            res <- importInstrument parserType basedir samplesDir path
             case res of
                 Left err -> do
                     displayErrorBox (guiDkParentWindow gui) err
                     return (Left err)
                 Right instFile -> do
-                    setInstrumentFile ins instFile
+                    instrumentPageSetInstrumentFile ins instFile
 
                     -- update the progress bar
                     frac <- progressBarGetFraction progress
@@ -523,10 +544,14 @@ writeDrumKitFile' gui nm basepath = do
                     insts <- listStoreToList (guiTvInstrumentsModel gui)
                     basedir <- entryGetText (guiBaseDir gui)
                     let d' = d {dkName = nm, dkDescription = desc, dkChannels = channels, dkInstruments = insts}
-                        drumkitCont = convertToDrumkitXML d'
+                        --drumkitCont = convertToDrumkitXML d'
                         dgPath = getDrumgizmoDir basedir
                         drumkitFName = dgPath </> unpack nm <.> ".xml"
-                    B.writeFile drumkitFName drumkitCont
+
+                    writeIORef (guiDrumkit gui) (Just d')
+
+                    writeDrumKitXML d' drumkitFName
+                    --B.writeFile drumkitFName drumkitCont
 
                     -- also export the instrument files
                     exportInstruments gui
@@ -535,7 +560,7 @@ writeDrumKitFile' gui nm basepath = do
 exportInstruments :: DrumkitPage -> IO ()
 exportInstruments gui = do
     v <- readIORef (guiDkInstrumentPages gui)
-    vres <- V.forM v writeInstrumentFile
+    vres <- V.forM v instrumentPageWriteInstrumentFile
 
     if V.any isLeft vres
         then do
@@ -556,7 +581,7 @@ resetDrumkit gui = do
     writeIORef (guiDrumkit gui) Nothing
 
     v <- readIORef (guiDkInstrumentPages gui)
-    V.mapM_ resetInstrumentPage v
+    V.mapM_ instrumentPageReset v
     writeIORef (guiDkInstrumentPages gui) empty
 
     resetMidiMap (guiMidiMapGM gui)

@@ -6,6 +6,7 @@ where
 import Control.Monad (void)
 import Data.Text
 import Data.Set as S
+import Data.List as L ((\\))
 import System.FilePath
 import Text.Parsec as P
 import Data.List (sortOn)
@@ -37,6 +38,8 @@ data Instrument =
     | Tom TomType
     | Cymbal
     | Ride
+    | Shaker
+    | Tambourine
     deriving (Show, Read, Eq)
 
 instance Ord Instrument where
@@ -51,6 +54,8 @@ toNumber HiHat = 3
 toNumber (Tom _) = 4
 toNumber Cymbal = 5
 toNumber Ride = 6
+toNumber Shaker = 7
+toNumber Tambourine = 8
 
 
 
@@ -64,7 +69,15 @@ data MicType =
     | Sub
     | Overhead
     | Room
+    | Room1
+    | Room2
     | FullMix
+    | Kit1
+    | Kit2
+    | KickClose
+    | SnareClose
+    | Top
+    | Bottom
     deriving (Show, Enum, Ord, Eq)
 
 data HiHatState =
@@ -76,6 +89,11 @@ data HiHatState =
     | HiHatOpen
     | HiHatPedalShut
     | HiHatPedalOpen
+    | HiHatBrushOpen
+    | HiHatBrushClosed
+    | HiHatHotRodsOpen
+    | HiHatHotRodsClosed
+    | HiHatUndefined
     deriving (Show, Enum, Ord, Eq)
 
 
@@ -117,7 +135,7 @@ data AudioFile = AudioFile {
     afChannel:: !Microphones,
     afPath :: !FilePath,
     afFileChannel :: !Word
-} deriving (Show, Eq)
+} deriving (Show, Read, Eq)
 
 instance Ord AudioFile where
     compare x1 x2 = compare (afChannel x1) (afChannel x2)
@@ -148,39 +166,51 @@ data Microphones =
     | OHR
     | RoomL
     | RoomR
+    | Room1Mono
+    | Room2Mono
     | FullMixL
     | FullMixR
+    | ShakerC
+    | TambourineC
     | Undefined
+    deriving (Show, Read)
 
 
-instance Show Microphones where
-    show KickC =        "KickC"
-    show KickL =        "KickL"
-    show KickR =        "KickR"
-    show KickS =        "KickS"
-    show SnareTop =     "SnareTop"
-    show SnareBottom =  "SnareBottom"
-    show SnareL =       "SnareL"
-    show SnareR =       "SnareR"
-    show HiHatC =       "HiHatC"
-    show HiHatL =       "HiHatL"
-    show HiHatR =       "HiHatR"
-    show (TomC x) =     "TomC" ++ show x
-    show (TomL x) =     "TomL" ++ show x
-    show (TomR x) =     "TomR" ++ show x
-    show (FloorTomC x) =     "FloorTomC" ++ show x
-    show (FloorTomL x) =     "FloorTomL" ++ show x
-    show (FloorTomR x) =     "FloorTomR" ++ show x
-    show (RideC) =      "RideC"
-    show (RideL) =      "RideL"
-    show (RideR) =      "RideR"
-    show OHL =          "OHL"
-    show OHR =          "OHR"
-    show RoomL =        "RoomL"
-    show RoomR =        "RoomR"
-    show FullMixL =        "FullMixL"
-    show FullMixR =        "FullMixR"
-    show Undefined =    "Undefined"
+showMic :: Microphones -> String
+showMic KickC =        "KickC"
+showMic KickL =        "KickL"
+showMic KickR =        "KickR"
+showMic KickS =        "KickS"
+showMic SnareTop =     "SnareTop"
+showMic SnareBottom =  "SnareBottom"
+showMic SnareL =       "SnareL"
+showMic SnareR =       "SnareR"
+showMic HiHatC =       "HiHatC"
+showMic HiHatL =       "HiHatL"
+showMic HiHatR =       "HiHatR"
+showMic (TomC x) =     "TomC" ++ show x
+showMic (TomL x) =     "TomL" ++ show x
+showMic (TomR x) =     "TomR" ++ show x
+showMic (FloorTomC x) =     "FloorTomC" ++ show x
+showMic (FloorTomL x) =     "FloorTomL" ++ show x
+showMic (FloorTomR x) =     "FloorTomR" ++ show x
+showMic (RideC) =      "RideC"
+showMic (RideL) =      "RideL"
+showMic (RideR) =      "RideR"
+showMic OHL =          "OHL"
+showMic OHR =          "OHR"
+showMic RoomL =        "RoomL"
+showMic RoomR =        "RoomR"
+showMic Room1Mono =    "Room1Mono"
+showMic Room2Mono =    "Room2Mono"
+showMic FullMixL =     "FullMixL"
+showMic FullMixR =     "FullMixR"
+showMic ShakerC =      "ShakerC"
+showMic TambourineC =  "TambourineC"
+showMic Undefined =    "Undefined"
+
+
+
 
 instance Ord Microphones where
     compare x1 x2 = compare (micToInt x1) (micToInt x2)
@@ -212,7 +242,12 @@ micToInt RoomL = 75
 micToInt RoomR = 76
 micToInt FullMixL = 77
 micToInt FullMixR = 78
+micToInt ShakerC = 79
+micToInt TambourineC = 80
+micToInt Room1Mono = 81
+micToInt Room2Mono = 82
 micToInt Undefined = 100
+
 
 instance Eq Microphones where
     x1 == x2 = (micToInt x1) == (micToInt x2)
@@ -261,8 +296,12 @@ micParser = do
     <|> (try (string "OHR"          ) >> return OHR         )
     <|> (try (string "RoomL"        ) >> return RoomL       )
     <|> (try (string "RoomR"        ) >> return RoomR       )
+    <|> (try (string "Room1Mono"    ) >> return Room1Mono   )
+    <|> (try (string "Room2Mono"    ) >> return Room2Mono   )
     <|> (try (string "FullMixL"     ) >> return FullMixL    )
     <|> (try (string "FullMixR"     ) >> return FullMixR    )
+    <|> (try (string "ShakerC"      ) >> return ShakerC     )
+    <|> (try (string "TambourineC"  ) >> return TambourineC )
     <|> return Undefined
 
 
@@ -291,7 +330,7 @@ instrumentFileToChannelMap ifl =
         grp | ifType ifl == HiHat = Just "hihat"
             | otherwise = Nothing
         chans' = getAvailableChannelsIF ifl S.empty
-        chans = Prelude.map (\x -> (x, x)) . Prelude.map (pack . show) $ toAscList chans'
+        chans = Prelude.map (\x -> (x, x)) . Prelude.map (pack . showMic) $ toAscList chans'
 
 
 
@@ -327,7 +366,8 @@ getMidiNoteFromInstrument (Tom (Floor _)) = 43
 getMidiNoteFromInstrument (Tom (RackTom _)) = 45
 getMidiNoteFromInstrument Cymbal = 55
 getMidiNoteFromInstrument Ride = 51
-
+getMidiNoteFromInstrument Shaker = 48
+getMidiNoteFromInstrument Tambourine = 32
 
 
 midiNotes :: M.IntMap Text
@@ -344,5 +384,8 @@ midiNotes = M.fromList (Prelude.zip midi finalNotes)
 midiToNote :: Int -> Text
 midiToNote x = maybe "--" id $ M.lookup x midiNotes
 
+
+removeSamples :: HitSample -> [AudioFile] -> HitSample
+removeSamples hs samples = hs { hsSamples = hsSamples hs L.\\ samples }
 
 

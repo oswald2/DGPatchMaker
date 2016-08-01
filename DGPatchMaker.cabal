@@ -75,6 +75,8 @@ executable DGPatchMaker
                        conduit,
                        xml-conduit,
                        xml-types,
+                       conduit-combinators,
+                       network-uri,
                        gtk3
 
   ghc-options: -O2 -Wall -rtsopts
@@ -108,6 +110,11 @@ executable ParseTest
                        bytestring,
                        hsndfile,
                        transformers,
+                       resourcet,
+                       conduit,
+                       xml-conduit,
+                       xml-types,
+                       conduit-combinators,
                        containers
 
   ghc-options: -O2 -Wall -rtsopts
