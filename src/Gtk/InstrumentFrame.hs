@@ -14,7 +14,7 @@ where
 
 import Control.Monad (void, when, forM_)
 import Control.Monad.IO.Class (liftIO)
---import Control.Exception
+import Control.Exception (bracket)
 
 import Prelude as P
 
@@ -40,6 +40,7 @@ import Data.Char (isSpace)
 import Data.Either
 import Data.List as L (intercalate)
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable as VS
 
 import Data.DrumDrops.Utils
 
@@ -49,7 +50,8 @@ import Gtk.InstrumentPageBuilder
 
 import Network.URI (unEscapeString)
 
-import Sound.File.Sndfile (getFileInfo, Info(..))
+import Sound.File.Sndfile as SF (getFileInfo, Info(..), IOMode(..), openFile, hGetBuffer, hClose)
+import Sound.File.Sndfile.Buffer.Vector as BV
 
 
 
@@ -75,7 +77,9 @@ data InstrumentPage = InstrumentPage {
     guiEntryType :: Entry,
     guiAudioSamplesMenu :: Menu,
     guiIPParserCombo :: ComboBox,
-    guiHitSamplesMenu :: Menu
+    guiHitSamplesMenu :: Menu,
+    guiSpinAttack :: SpinButton,
+    guiSpinSpread :: SpinButton
     }
 
 
@@ -108,6 +112,10 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
     hitPopUp <- builderGetObject builder castToMenu ("menuHits" :: Text)
     menuAddHitSample <- builderGetObject builder castToMenuItem ("menuitemAddHitSample" :: Text)
     menuRemoveHitSample <- builderGetObject builder castToMenuItem ("menuitemRemoveHitSample" :: Text)
+
+    spinAttack <- builderGetObject builder castToSpinButton ("spinbuttonAttack" :: Text)
+    spinSpread <- builderGetObject builder castToSpinButton ("spinbuttonSpread" :: Text)
+    calcHitB <- builderGetObject builder castToButton ("buttonCalcHits" :: Text)
 
     -- create a tag that we use as selection, target and selection type
     sampleTypeTag <- atomNew ("_SampleType" :: Text)
@@ -142,7 +150,9 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
         guiIPInstrumentPages = ioref,
         guiIPParserCombo = combo,
         guiHitSamplesMenu = hitPopUp,
-        guiRendererHPName = rendererHPName
+        guiRendererHPName = rendererHPName,
+        guiSpinAttack = spinAttack,
+        guiSpinSpread = spinSpread
         }
 
     -- set the default values for this instrument page
@@ -168,6 +178,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
 
     void $ on treeviewHit dragDataReceived $ dragDataReceivedSignalHit gui
 
+    void $ on calcHitB buttonActivated (calcPower gui)
+
     -- setup the local callbacks for the treeviews
     setupCallbacks gui
 
@@ -182,7 +194,8 @@ dragDataReceivedSignal :: InstrumentPage -> DragContext -> Point -> InfoId -> Ti
 dragDataReceivedSignal gui dragContext _ _ timestamp = do
     txt <- selectionDataGetURIs
     liftIO $ do
-        maybe (return ()) (dropAction gui) txt
+        b <- treeViewIsSelected (guiInstHitView gui)
+        when b $ maybe (return ()) (dropAction gui) txt
         dragFinish dragContext True False timestamp
     return ()
 
@@ -204,7 +217,7 @@ dragDataGetSignal gui _ _ _ = do
         let ls = guiInstSamplesViewModel gui
         mapM (listStoreGetValue ls) (P.concat rows)
 
-    done <- selectionDataSetText (show r)
+    void $ selectionDataSetText (show r)
     return ()
 
 
@@ -223,7 +236,7 @@ dropAction gui x = do
             let ls = guiInstSamplesViewModel gui
 
             mapM_ (listStoreAppend ls) af
-            updateHitSample gui af
+            updateHitSample gui hsAddSamples af
 
 
 dropActionHit :: InstrumentPage -> Point -> Text -> IO ()
@@ -258,8 +271,7 @@ dropActionHit gui point txt = do
             P.putStrLn $ "idx: " ++ show idx ++ " dest: " ++ show (hsAddSamples dest afs)
 
             -- activate the row so that the audio sample view is refreshed
-            Just col <- treeViewGetColumn (guiInstHitView gui) 0
-            treeViewRowActivated (guiInstHitView gui) [srcx] col
+            activateRow (guiInstHitView gui) srcx
 
         _ -> return ()
 
@@ -293,7 +305,7 @@ getAudioSampleFromFile basepath file = do
 
     let relName x = determinePath basepath (dropFileName x) (pack (takeFileName x))
 
-    return $ P.map (\x -> AudioFile Undefined (relName file) (fromIntegral x)) idx
+    return $ P.map (\x -> AudioFile Undefined (relName file) (fromIntegral x) Nothing) idx
 
 
 
@@ -415,18 +427,22 @@ initTreeViewSamples tv ls sampleTypeTag = do
     col1 <- treeViewColumnNew
     col2 <- treeViewColumnNew
     col3 <- treeViewColumnNew
+    col4 <- treeViewColumnNew
 
     treeViewColumnSetTitle col1 ("Channel" :: Text)
     treeViewColumnSetTitle col2 ("File" :: Text)
     treeViewColumnSetTitle col3 ("Filechannel" :: Text)
+    treeViewColumnSetTitle col4 ("Power" :: Text)
 
     renderer1 <- cellRendererTextNew
     renderer2 <- cellRendererTextNew
     renderer3 <- cellRendererTextNew
+    renderer4 <- cellRendererTextNew
 
     cellLayoutPackStart col1 renderer1 True
     cellLayoutPackStart col2 renderer2 True
     cellLayoutPackStart col3 renderer3 True
+    cellLayoutPackStart col4 renderer4 True
 
     set renderer1 [cellTextEditable := True,
                     cellTextEditableSet := True,
@@ -443,10 +459,12 @@ initTreeViewSamples tv ls sampleTypeTag = do
     cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := pack (showMic (afChannel hs))]
     cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := afPath hs ]
     cellLayoutSetAttributes col3 renderer3 ls $ \hs -> [ cellText := pack (show (afFileChannel hs)) ]
+    cellLayoutSetAttributes col4 renderer4 ls $ \hs -> [ cellText := showPower hs ]
 
     _ <- treeViewAppendColumn tv col1
     _ <- treeViewAppendColumn tv col2
     _ <- treeViewAppendColumn tv col3
+    _ <- treeViewAppendColumn tv col4
 
     -- enable multiple selection mode
     sel <- treeViewGetSelection tv
@@ -473,6 +491,13 @@ initTreeViewSamples tv ls sampleTypeTag = do
 
 
     return (renderer1, renderer3)
+
+
+showPower :: AudioFile -> Text
+showPower af =
+    case afPower af of
+        Nothing -> "--"
+        Just x -> pack (show x)
 
 
 dndInfoId :: InfoId
@@ -627,20 +652,17 @@ addSamples gui = do
         af <- getAudioSamplesFromFiles basepath names
         mapM_ (listStoreAppend (guiInstSamplesViewModel gui)) af
 
-        updateHitSample gui af
+        updateHitSample gui hsAddSamples af
 
 
-updateHitSample :: InstrumentPage -> [AudioFile] -> IO ()
-updateHitSample gui af = do
+updateHitSample :: InstrumentPage -> (HitSample -> [AudioFile] -> HitSample) -> [AudioFile] -> IO ()
+updateHitSample gui f af = do
     -- also update the hit sample
     sel <- treeViewGetSelection (guiInstHitView gui)
     path <- treeSelectionGetSelectedRows sel
     let idx = P.head (P.head path)
     hsVal <- listStoreGetValue (guiInstHitViewModel gui) idx
-    P.putStrLn $ "addSamples: " ++ show hsVal
-    listStoreSetValue (guiInstHitViewModel gui) idx (hsAddSamples hsVal af)
-    hsVal' <- listStoreGetValue (guiInstHitViewModel gui) idx
-    P.putStrLn $ "addSamples: " ++ show hsVal'
+    listStoreSetValue (guiInstHitViewModel gui) idx (f hsVal af)
 
 
 loadSamples :: InstrumentPage -> IO [FilePath]
@@ -702,8 +724,7 @@ removeAudioSamples gui = do
     listStoreSetValue (guiInstHitViewModel gui) selHit (hsRemoveSamples hs samples)
 
     -- activate the row so that the audio sample view is refreshed
-    Just col <- treeViewGetColumn (guiInstHitView gui) 0
-    treeViewRowActivated (guiInstHitView gui) [selHit] col
+    activateRow (guiInstHitView gui) selHit
 
 
 addHitPower :: InstrumentPage -> IO ()
@@ -714,6 +735,7 @@ addHitPower gui = do
         smplName = instName `append` "-" `append` pack (show (n + 1))
     idx <- listStoreAppend (guiInstHitViewModel gui) defSample
     treeViewSetCursor (guiInstHitView gui) [idx] Nothing
+    activateRow (guiInstHitView gui) idx
 
 
 removeHitPower :: InstrumentPage -> IO ()
@@ -724,9 +746,13 @@ removeHitPower gui = do
 
     -- activate the row so that the audio sample view is refreshed
     selHitAct <- P.head . P.head <$> treeSelectionGetSelectedRows sel1
-    Just col <- treeViewGetColumn (guiInstHitView gui) 0
-    treeViewRowActivated (guiInstHitView gui) [selHitAct] col
+    activateRow (guiInstHitView gui) selHitAct
 
+
+activateRow :: TreeView -> Int -> IO ()
+activateRow tv idx = do
+    Just col <- treeViewGetColumn tv 0
+    treeViewRowActivated tv [idx] col
 
 
 getInstrumentFromGUI :: InstrumentPage -> IO (Either Text InstrumentFile)
@@ -854,3 +880,49 @@ instrumentPageSetInstrumentName gui name = do
     let nm' = T.filter (not . isSpace) name
     entrySetText (guiEntryName gui) nm'
     setCurrentNotebookLabel gui nm'
+
+
+
+calcPower :: InstrumentPage -> IO ()
+calcPower gui = do
+    -- get the values from the gui
+    attack <- round <$> spinButtonGetValue (guiSpinAttack gui)
+    spread <- spinButtonGetValue (guiSpinSpread gui)
+    basepath <- unpack <$> entryGetText (guiIPEntryBaseDir gui)
+
+    afs <- listStoreToList (guiInstSamplesViewModel gui)
+
+    when (not (P.null afs)) $ do
+        -- do the calculation
+        res <- mapM (calcHit basepath attack spread) afs
+
+        setListStoreTo (guiInstSamplesViewModel gui) res
+
+        -- update the hit view
+        updateHitSample gui hsReplaceSamples res
+
+    where
+        calcHit :: FilePath -> Int -> Double -> AudioFile -> IO AudioFile
+        calcHit basepath attack spread x = do
+            let path = getInstrumentDir basepath </> afPath x
+            info <- getFileInfo path
+            bracket (openFile path ReadMode info)
+                    (hClose)
+                    (\h -> do
+                        b <- hGetBuffer h attack
+                        case b of
+                            Nothing -> return x
+                            Just buf -> do
+                                let v :: VS.Vector Double
+                                    v = BV.fromBuffer buf
+                                    !hp = performCalc attack spread v
+                                return (x {afPower = Just hp})
+                    )
+        performCalc :: Int -> Double -> VS.Vector Double -> Double
+        performCalc attack spread v = (f v) ** s
+            where
+                s = spread / 1000
+                f = VS.foldl' (\a b -> a + b * b) 0.0 . VS.take attack
+
+
+

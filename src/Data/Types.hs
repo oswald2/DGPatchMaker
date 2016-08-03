@@ -134,7 +134,8 @@ data HitSample = HitSample {
 data AudioFile = AudioFile {
     afChannel:: !Microphones,
     afPath :: !FilePath,
-    afFileChannel :: !Word
+    afFileChannel :: !Word,
+    afPower :: Maybe Double
 } deriving (Show, Read, Eq)
 
 instance Ord AudioFile where
@@ -391,3 +392,6 @@ hsRemoveSamples hs samples = hs { hsSamples = hsSamples hs L.\\ samples }
 
 hsAddSamples :: HitSample -> [AudioFile] -> HitSample
 hsAddSamples hs samples = hs { hsSamples = hsSamples hs ++ samples }
+
+hsReplaceSamples :: HitSample -> [AudioFile] -> HitSample
+hsReplaceSamples hs samples = hs { hsSamples = samples }

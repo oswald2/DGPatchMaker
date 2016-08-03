@@ -146,11 +146,11 @@ convertSample :: ParserType -> FilePath -> FilePath -> Sample -> [AudioFile]
 convertSample parserType basepath path x =
     case saChannels x of
         1 -> case saInstrumentProperties x of
-                InstS FullMix -> [AudioFile (determineChannel parserType x LeftA) (determinePath basepath path (saFileName x)) 1,
-                                  AudioFile (determineChannel parserType x RightA) (determinePath basepath path (saFileName x)) 1]
-                _ -> [AudioFile (determineChannel parserType x Mono) (determinePath basepath path (saFileName x)) 1]
-        2 -> [AudioFile (determineChannel parserType x LeftA) (determinePath basepath path (saFileName x)) 1,
-              AudioFile (determineChannel parserType x RightA) (determinePath basepath path (saFileName x)) 2]
+                InstS FullMix -> [AudioFile (determineChannel parserType x LeftA) (determinePath basepath path (saFileName x)) 1 Nothing,
+                                  AudioFile (determineChannel parserType x RightA) (determinePath basepath path (saFileName x)) 1 Nothing]
+                _ -> [AudioFile (determineChannel parserType x Mono) (determinePath basepath path (saFileName x)) 1 Nothing]
+        2 -> [AudioFile (determineChannel parserType x LeftA) (determinePath basepath path (saFileName x)) 1 Nothing,
+              AudioFile (determineChannel parserType x RightA) (determinePath basepath path (saFileName x)) 2 Nothing]
         _ -> []
 
 
