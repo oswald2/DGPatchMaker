@@ -385,7 +385,9 @@ midiToNote :: Int -> Text
 midiToNote x = maybe "--" id $ M.lookup x midiNotes
 
 
-removeSamples :: HitSample -> [AudioFile] -> HitSample
-removeSamples hs samples = hs { hsSamples = hsSamples hs L.\\ samples }
+hsRemoveSamples :: HitSample -> [AudioFile] -> HitSample
+hsRemoveSamples hs samples = hs { hsSamples = hsSamples hs L.\\ samples }
 
 
+hsAddSamples :: HitSample -> [AudioFile] -> HitSample
+hsAddSamples hs samples = hs { hsSamples = hsSamples hs ++ samples }

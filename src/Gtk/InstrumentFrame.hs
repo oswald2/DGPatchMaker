@@ -190,7 +190,6 @@ dragDataReceivedSignalHit :: InstrumentPage -> DragContext -> Point -> InfoId ->
 dragDataReceivedSignalHit gui dragContext point _ timestamp = do
     txt <- selectionDataGetText
     liftIO $ do
-        T.putStrLn "dragDataReceivedSignalHit called!"
         maybe (return ()) (dropActionHit gui point) txt
 
         dragFinish dragContext True False timestamp
@@ -200,14 +199,12 @@ dragDataReceivedSignalHit gui dragContext point _ timestamp = do
 dragDataGetSignal :: InstrumentPage -> DragContext -> InfoId -> TimeStamp -> SelectionDataM ()
 dragDataGetSignal gui _ _ _ = do
     r <- liftIO $ do
-        T.putStrLn "Drag-Data-Get called"
         sel <- treeViewGetSelection (guiInstSamplesView gui)
         rows <- treeSelectionGetSelectedRows sel
         let ls = guiInstSamplesViewModel gui
         mapM (listStoreGetValue ls) (P.concat rows)
 
     done <- selectionDataSetText (show r)
-    liftIO $ if done then T.putStrLn "Done." else T.putStrLn "Not done."
     return ()
 
 
@@ -226,33 +223,45 @@ dropAction gui x = do
             let ls = guiInstSamplesViewModel gui
 
             mapM_ (listStoreAppend ls) af
+            updateHitSample gui af
 
 
 dropActionHit :: InstrumentPage -> Point -> Text -> IO ()
 dropActionHit gui point txt = do
-    T.putStrLn $ "dropActionHit called: " `append` txt
-
     -- get the drag and drop data from text into data
     let afs :: [AudioFile]
         afs = read (unpack txt)
 
     -- check, if we are with the mouse pointer over a hit sample
     let tv = guiInstHitView gui
-
-    P.putStrLn $ "Point: " ++ show point
-
-    res <- treeViewGetPathAtPos tv point
-
+    pos <- treeViewConvertWidgetToTreeCoords (guiInstHitView gui) point
+    res <- treeViewGetPathAtPos tv pos
     case res of
-        Nothing -> do
-            T.putStrLn "Nothing"
-            return ()
-        Just (path, _, _) -> do
-            T.putStrLn $ "Path: " `append` pack (show path)
+        Nothing -> return ()
+        Just ((idx:_), _, _) -> do
+            -- get the selected hit sample and remove the audio samples
+            -- then get the drop destination hit sample and add the samples
+            sel <- treeViewGetSelection (guiInstHitView gui)
+            ((srcx:_):_) <- treeSelectionGetSelectedRows sel
+            let ls = guiInstHitViewModel gui
+            src <- listStoreGetValue ls srcx
 
+            P.putStrLn $ "srcx: " ++ show srcx ++ " src: " ++ show src
 
-    return ()
+            listStoreSetValue ls srcx (hsRemoveSamples src afs)
 
+            P.putStrLn $ "srcx: " ++ show srcx ++ " src: " ++ show (hsRemoveSamples src afs)
+
+            dest <- listStoreGetValue ls idx
+            P.putStrLn $ "idx: " ++ show idx ++ " dest: " ++ show dest
+            listStoreSetValue ls idx (hsAddSamples dest afs)
+            P.putStrLn $ "idx: " ++ show idx ++ " dest: " ++ show (hsAddSamples dest afs)
+
+            -- activate the row so that the audio sample view is refreshed
+            Just col <- treeViewGetColumn (guiInstHitView gui) 0
+            treeViewRowActivated (guiInstHitView gui) [srcx] col
+
+        _ -> return ()
 
 
 checkFileNames :: Text -> Either Text FilePath
@@ -618,15 +627,20 @@ addSamples gui = do
         af <- getAudioSamplesFromFiles basepath names
         mapM_ (listStoreAppend (guiInstSamplesViewModel gui)) af
 
-        -- also update the hit sample
-        sel <- treeViewGetSelection (guiInstHitView gui)
-        path <- treeSelectionGetSelectedRows sel
-        let idx = P.head (P.head path)
-        hsVal <- listStoreGetValue (guiInstHitViewModel gui) idx
-        let samples = hsSamples hsVal
-            samples' = samples ++ af
-            hsVal' = hsVal {hsSamples = samples'}
-        listStoreSetValue (guiInstHitViewModel gui) idx hsVal'
+        updateHitSample gui af
+
+
+updateHitSample :: InstrumentPage -> [AudioFile] -> IO ()
+updateHitSample gui af = do
+    -- also update the hit sample
+    sel <- treeViewGetSelection (guiInstHitView gui)
+    path <- treeSelectionGetSelectedRows sel
+    let idx = P.head (P.head path)
+    hsVal <- listStoreGetValue (guiInstHitViewModel gui) idx
+    P.putStrLn $ "addSamples: " ++ show hsVal
+    listStoreSetValue (guiInstHitViewModel gui) idx (hsAddSamples hsVal af)
+    hsVal' <- listStoreGetValue (guiInstHitViewModel gui) idx
+    P.putStrLn $ "addSamples: " ++ show hsVal'
 
 
 loadSamples :: InstrumentPage -> IO [FilePath]
@@ -685,7 +699,7 @@ removeAudioSamples gui = do
     selHit <- P.head . P.head <$> treeSelectionGetSelectedRows sel1
     hs <- listStoreGetValue (guiInstHitViewModel gui) selHit
     -- set new Hit Sample
-    listStoreSetValue (guiInstHitViewModel gui) selHit (removeSamples hs samples)
+    listStoreSetValue (guiInstHitViewModel gui) selHit (hsRemoveSamples hs samples)
 
     -- activate the row so that the audio sample view is refreshed
     Just col <- treeViewGetColumn (guiInstHitView gui) 0
