@@ -115,6 +115,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     defExportButton <- builderGetObject builder castToButton ("buttonExportDefMap" :: Text)
 
     resetButton <- builderGetObject builder castToButton ("buttonReset" :: Text)
+    compileButton <- builderGetObject builder castToButton ("buttonCompile" :: Text)
 
     midiMapGm <- initMidiMap mainWindow tvMidiGM entryBaseDirectory gmLoadButton gmExportButton
     midiMapDef <- initMidiMap mainWindow tvMidiDef entryBaseDirectory defLoadButton defExportButton
@@ -155,6 +156,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     void $ G.on buttonExportDrumkit buttonActivated $ exportDrumKit gui
 
     void $ G.on resetButton buttonActivated $ resetDrumkit gui
+    void $ G.on compileButton buttonActivated $ compileDrumkit gui
 
     setupCallbacks gui
 
@@ -588,3 +590,35 @@ resetDrumkit gui = do
     resetMidiMap (guiMidiMapDef gui)
 
     return ()
+
+
+compileDrumkit :: DrumkitPage -> IO ()
+compileDrumkit gui = do
+    inst <- readIORef (guiDkInstrumentPages gui)
+
+    instF <- V.mapM instrumentPageGetInstrumentFile inst
+
+    let errs = lefts (V.toList instF)
+    if not (null errs)
+        then do
+            displayMultiErrors (guiErrDiag gui) "Multiple errors happened during Import of Instruments:" errs
+            return ()
+        else do
+            nm <- getDkName gui
+            desc <- getDkDescription gui
+
+            let drumkit = generateDrumkit nm desc insts
+                insts = rights (V.toList instF)
+
+            -- set the actual drumkit
+            writeIORef (guiDrumkit gui) (Just drumkit)
+
+            -- set the channels for viewing
+            setChannels gui (dkChannels drumkit)
+            setInstruments gui (dkInstruments drumkit)
+
+            -- also convert the drumkit to a midi map
+            let midimap = getMidiMap drumkit
+
+            setMidiMap (guiMidiMapGM gui) midimap
+            setMidiMap (guiMidiMapDef gui) midimap

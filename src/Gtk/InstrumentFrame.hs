@@ -9,6 +9,8 @@ module Gtk.InstrumentFrame
     ,instrumentPageWriteInstrumentFile
     ,instrumentPageReset
     ,instrumentPageSetInstrumentName
+    ,instrumentPageGetInstrumentName
+    ,instrumentPageGetInstrumentFile
     )
 where
 
@@ -26,9 +28,6 @@ import Gtk.Utils
 
 import Data.Text as T
 import Data.Text.IO as T
---import qualified Data.Text.Lazy as TL
---import Data.Text.Format
---import qualified Data.ByteString.Lazy as B
 
 import Data.Types
 import Data.IORef
@@ -38,7 +37,7 @@ import Data.Export
 import Data.Maybe
 import Data.Char (isSpace)
 import Data.Either
-import Data.List as L (intercalate)
+--import Data.List as L (intercalate)
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 
@@ -53,7 +52,7 @@ import Network.URI (unEscapeString)
 import Sound.File.Sndfile as SF (getFileInfo, Info(..), IOMode(..), openFile, hGetBuffer, hClose)
 import Sound.File.Sndfile.Buffer.Vector as BV
 
-
+import Text.Printf
 
 
 data InstrumentPage = InstrumentPage {
@@ -117,15 +116,11 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
     spinSpread <- builderGetObject builder castToSpinButton ("spinbuttonSpread" :: Text)
     calcHitB <- builderGetObject builder castToButton ("buttonCalcHits" :: Text)
 
-    -- create a tag that we use as selection, target and selection type
-    sampleTypeTag <- atomNew ("_SampleType" :: Text)
-
-
     hsls <- listStoreNew []
-    (rendererHPName, rendererHP) <- initTreeViewHit treeviewHit hsls sampleTypeTag
+    (rendererHPName, rendererHP) <- initTreeViewHit treeviewHit hsls
 
     sals <- listStoreNew []
-    (rendChan, rendFileChan) <- initTreeViewSamples treeviewSamples sals sampleTypeTag
+    (rendChan, rendFileChan) <- initTreeViewSamples treeviewSamples sals
 
     ifr <- newIORef Nothing
 
@@ -258,17 +253,10 @@ dropActionHit gui point txt = do
             ((srcx:_):_) <- treeSelectionGetSelectedRows sel
             let ls = guiInstHitViewModel gui
             src <- listStoreGetValue ls srcx
-
-            P.putStrLn $ "srcx: " ++ show srcx ++ " src: " ++ show src
-
             listStoreSetValue ls srcx (hsRemoveSamples src afs)
 
-            P.putStrLn $ "srcx: " ++ show srcx ++ " src: " ++ show (hsRemoveSamples src afs)
-
             dest <- listStoreGetValue ls idx
-            P.putStrLn $ "idx: " ++ show idx ++ " dest: " ++ show dest
             listStoreSetValue ls idx (hsAddSamples dest afs)
-            P.putStrLn $ "idx: " ++ show idx ++ " dest: " ++ show (hsAddSamples dest afs)
 
             -- activate the row so that the audio sample view is refreshed
             activateRow (guiInstHitView gui) srcx
@@ -365,8 +353,8 @@ instrumentPageGetMainBox :: InstrumentPage -> Box
 instrumentPageGetMainBox = guiInstMainBox
 
 
-initTreeViewHit :: TreeView -> ListStore HitSample -> TargetTag  -> IO (CellRendererText, CellRendererText)
-initTreeViewHit tv ls sampleTypeTag = do
+initTreeViewHit :: TreeView -> ListStore HitSample -> IO (CellRendererText, CellRendererText)
+initTreeViewHit tv ls = do
     treeViewSetModel tv ls
 
     treeViewSetHeadersVisible tv True
@@ -417,8 +405,8 @@ initTreeViewHit tv ls sampleTypeTag = do
 
 
 
-initTreeViewSamples :: TreeView -> ListStore AudioFile -> TargetTag -> IO (CellRendererText, CellRendererText)
-initTreeViewSamples tv ls sampleTypeTag = do
+initTreeViewSamples :: TreeView -> ListStore AudioFile -> IO (CellRendererText, CellRendererText)
+initTreeViewSamples tv ls = do
     treeViewSetModel tv ls
 
     treeViewSetHeadersVisible tv True
@@ -497,11 +485,8 @@ showPower :: AudioFile -> Text
 showPower af =
     case afPower af of
         Nothing -> "--"
-        Just x -> pack (show x)
+        Just x -> pack (printf "%10.5f" x)
 
-
-dndInfoId :: InfoId
-dndInfoId = 1
 
 dndDragId :: InfoId
 dndDragId = 2
@@ -880,6 +865,20 @@ instrumentPageSetInstrumentName gui name = do
     let nm' = T.filter (not . isSpace) name
     entrySetText (guiEntryName gui) nm'
     setCurrentNotebookLabel gui nm'
+
+instrumentPageGetInstrumentName :: InstrumentPage -> IO Text
+instrumentPageGetInstrumentName gui = entryGetText (guiEntryName gui)
+
+instrumentPageGetInstrumentFile :: InstrumentPage -> IO (Either Text InstrumentFile)
+instrumentPageGetInstrumentFile gui = do
+    i <- getInstrumentFromGUI gui
+    case i of
+        Left err -> do
+            name <- instrumentPageGetInstrumentName gui
+            return $ Left (name `append` ": " `append` err)
+        Right instrumentFile -> do
+            storeInstrument gui instrumentFile
+            return $ Right instrumentFile
 
 
 
