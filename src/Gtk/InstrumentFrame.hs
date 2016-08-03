@@ -66,7 +66,7 @@ data InstrumentPage = InstrumentPage {
     guiInstHitViewModel :: ListStore HitSample,
     guiRendererHP :: CellRendererText,
     guiRendererHPName :: CellRendererText,
-    guiRendererChan :: CellRendererText,
+    guiRendererChan :: CellRendererCombo,
     guiRendererFileChan :: CellRendererText,
     guiInstSamplesView :: TreeView,
     guiInstSamplesViewModel :: ListStore AudioFile,
@@ -405,7 +405,7 @@ initTreeViewHit tv ls = do
 
 
 
-initTreeViewSamples :: TreeView -> ListStore AudioFile -> IO (CellRendererText, CellRendererText)
+initTreeViewSamples :: TreeView -> ListStore AudioFile -> IO (CellRendererCombo, CellRendererText)
 initTreeViewSamples tv ls = do
     treeViewSetModel tv ls
 
@@ -422,10 +422,20 @@ initTreeViewSamples tv ls = do
     treeViewColumnSetTitle col3 ("Filechannel" :: Text)
     treeViewColumnSetTitle col4 ("Power" :: Text)
 
-    renderer1 <- cellRendererTextNew
+    treeViewColumnSetResizable col1 True
+    treeViewColumnSetSizing col1 TreeViewColumnAutosize
+
+    renderer1 <- cellRendererComboNew
     renderer2 <- cellRendererTextNew
     renderer3 <- cellRendererTextNew
     renderer4 <- cellRendererTextNew
+
+    lsChans <- listStoreNew chanList
+
+    let colId :: ColumnId Text Text
+        colId = makeColumnIdString 0
+
+    treeModelSetColumn lsChans colId id
 
     cellLayoutPackStart col1 renderer1 True
     cellLayoutPackStart col2 renderer2 True
@@ -435,7 +445,10 @@ initTreeViewSamples tv ls = do
     set renderer1 [cellTextEditable := True,
                     cellTextEditableSet := True,
                     cellTextBackgroundColor := paleYellow,
-                    cellTextBackgroundSet := True
+                    cellTextBackgroundSet := True,
+
+                    cellComboHasEntry := True,
+                    cellComboTextModel := (lsChans, colId)
                     ]
     set renderer3 [cellTextEditable := True,
                     cellTextEditableSet := True,
@@ -444,7 +457,7 @@ initTreeViewSamples tv ls = do
                     ]
 
 
-    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := pack (showMic (afChannel hs))]
+    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := pack (showMic (afChannel hs)), cellComboTextModel := (lsChans, colId)]
     cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := afPath hs ]
     cellLayoutSetAttributes col3 renderer3 ls $ \hs -> [ cellText := pack (show (afFileChannel hs)) ]
     cellLayoutSetAttributes col4 renderer4 ls $ \hs -> [ cellText := showPower hs ]
@@ -480,7 +493,6 @@ initTreeViewSamples tv ls = do
 
     return (renderer1, renderer3)
 
-
 showPower :: AudioFile -> Text
 showPower af =
     case afPower af of
@@ -491,6 +503,50 @@ showPower af =
 dndDragId :: InfoId
 dndDragId = 2
 
+
+
+chanList :: [Text]
+chanList = P.map (pack.showMic)
+    [KickC,
+     KickL,
+     KickR,
+     KickS,
+     SnareTop,
+     SnareBottom,
+     SnareL,
+     SnareR,
+     HiHatC,
+     HiHatL,
+     HiHatR,
+     TomC 1,
+     TomL 1,
+     TomR 1,
+     TomC 2,
+     TomL 2,
+     TomR 2,
+     TomC 3,
+     TomL 3,
+     TomR 3,
+     FloorTomC 1,
+     FloorTomL 1,
+     FloorTomR 1,
+     FloorTomC 2,
+     FloorTomL 2,
+     FloorTomR 2,
+     RideC,
+     RideL,
+     RideR,
+     OHL,
+     OHR,
+     RoomL,
+     RoomR,
+     Room1Mono,
+     Room2Mono,
+     FullMixL,
+     FullMixR,
+     ShakerC,
+     TambourineC,
+     Undefined]
 
 setCurrentNotebookLabel :: InstrumentPage -> Text -> IO ()
 setCurrentNotebookLabel instPage name = do
@@ -617,6 +673,13 @@ setupCallbacks instPage = do
                     upd s = if s == val then val' else s
                     hsVal' = hsVal {hsSamples = samples'}
                 listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
+
+    void $ on (guiRendererChan instPage) editingStarted $ \widget treepath -> do
+        case treepath of
+            [_] -> do
+                comboListStore <- comboBoxSetModelText (castToComboBox widget)
+                mapM_ (listStoreAppend comboListStore) chanList
+            _ -> return ()
 
     return ()
 
