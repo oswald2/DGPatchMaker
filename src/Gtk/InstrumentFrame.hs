@@ -797,11 +797,6 @@ removeHitPower gui = do
     activateRow (guiInstHitView gui) selHitAct
 
 
-activateRow :: TreeView -> Int -> IO ()
-activateRow tv idx = do
-    Just col <- treeViewGetColumn tv 0
-    treeViewRowActivated tv [idx] col
-
 
 getInstrumentFromGUI :: InstrumentPage -> IO (Either Text InstrumentFile)
 getInstrumentFromGUI instPage = do

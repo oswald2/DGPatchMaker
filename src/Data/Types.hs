@@ -395,3 +395,11 @@ hsAddSamples hs samples = hs { hsSamples = hsSamples hs ++ samples }
 
 hsReplaceSamples :: HitSample -> [AudioFile] -> HitSample
 hsReplaceSamples hs samples = hs { hsSamples = samples }
+
+
+cmChangeChannel :: Text -> Text -> ChannelMap -> ChannelMap
+cmChangeChannel oldName newName cm = cm {cmMap = chans }
+    where
+        chans = Prelude.map chg (cmMap cm)
+        chg (inC, outC) | outC == oldName = (inC, newName)
+                        | otherwise = (inC, outC)

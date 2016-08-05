@@ -828,6 +828,28 @@
       </object>
     </child>
   </object>
+  <object class="GtkMenu" id="menuChannels">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <child>
+      <object class="GtkMenuItem" id="menuitemAddChannel">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Adds an output channel to the drumkit</property>
+        <property name="label" translatable="yes">Add Channel...</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="menuitemRemoveChannel">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Removes a output channel from the drumkit. If one is already assigned to an instrument, sets it to Unknown</property>
+        <property name="label" translatable="yes">Remove Channel...</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+  </object>
   <object class="GtkMessageDialog" id="messagedialogCustom">
     <property name="can_focus">False</property>
     <property name="window_position">center</property>

@@ -42,3 +42,8 @@ setListStoreTo ls xs = do
     listStoreClear ls
     mapM_ (void . listStoreAppend ls) xs
 
+activateRow :: TreeView -> Int -> IO ()
+activateRow tv idx = do
+    Just col <- treeViewGetColumn tv 0
+    treeViewRowActivated tv [idx] col
+

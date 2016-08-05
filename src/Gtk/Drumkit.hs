@@ -8,9 +8,6 @@ import ClassyPrelude
 
 import Prelude (read)
 
---import Control.Monad (void)
---import Control.Exception
-
 import System.FilePath.Find as F
 import System.FilePath
 
@@ -22,7 +19,6 @@ import Data.Drumgizmo
 --import Data.Import
 import Data.Either
 
---import qualified Data.ByteString.Lazy as B
 
 import qualified Data.Vector as V
 
@@ -33,6 +29,7 @@ import qualified Data.Set as S
 import Graphics.UI.Gtk as G
 
 import Gtk.Utils
+import Gtk.Colors
 import Gtk.InstrumentFrame
 import Gtk.ErrorDialog
 import Gtk.MidiMap
@@ -61,7 +58,9 @@ data DrumkitPage = DrumkitPage {
     guiErrDiag :: ErrorDialog,
     guiMidiMapGM :: MidiMapPage,
     guiMidiMapDef :: MidiMapPage,
-    guiParserCombo :: ComboBox
+    guiParserCombo :: ComboBox,
+    guiChannelMenu :: Menu,
+    guiChannelRenderer :: CellRendererText
 }
 
 
@@ -99,7 +98,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     dr <- newIORef Nothing
 
-    initTvChannels tvChannels lsm
+    channelRenderer <- initTvChannels tvChannels lsm
     initTvInstruments tvInstruments lsinst
     initTvChannelMap tvChannelMap lscm
 
@@ -121,6 +120,11 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     midiMapDef <- initMidiMap mainWindow tvMidiDef entryBaseDirectory defLoadButton defExportButton
 
     initParserCombo combo
+
+    channelMenu <- builderGetObject builder castToMenu ("menuChannels" :: Text)
+    itemAddChannel <- builderGetObject builder castToMenuItem ("menuitemAddChannel" :: Text)
+    itemRemoveChannel <- builderGetObject builder castToMenuItem ("menuitemRemoveChannel" :: Text)
+
 
     let gui = DrumkitPage{
             guiDkParentWindow = mainWindow,
@@ -144,7 +148,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
             guiDkInstrumentPages = ioref,
             guiMidiMapGM = midiMapGm,
             guiMidiMapDef = midiMapDef,
-            guiParserCombo = combo
+            guiParserCombo = combo,
+            guiChannelMenu = channelMenu,
+            guiChannelRenderer = channelRenderer
         }
 
     setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
@@ -157,6 +163,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     void $ G.on resetButton buttonActivated $ resetDrumkit gui
     void $ G.on compileButton buttonActivated $ compileDrumkit gui
+
+    void $ G.on itemAddChannel menuItemActivated $ addChannel gui
+    void $ G.on itemRemoveChannel menuItemActivated $ removeChannel gui
 
     setupCallbacks gui
 
@@ -367,7 +376,7 @@ getDirectoriesToImport path = do
         filterP = extension ==? ".wav"
 
 
-initTvChannels :: TreeView -> ListStore Microphones -> IO ()
+initTvChannels :: TreeView -> ListStore Microphones -> IO (CellRendererText)
 initTvChannels tv ls = do
     treeViewSetModel tv ls
 
@@ -382,6 +391,12 @@ initTvChannels tv ls = do
 
     cellLayoutPackStart col1 renderer1 True
 
+    set renderer1 [cellTextEditable := True,
+                    cellTextEditableSet := True,
+                    cellTextBackgroundColor := paleYellow,
+                    cellTextBackgroundSet := True
+                    ]
+
     cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := T.pack (show hs)]
 
     _ <- treeViewAppendColumn tv col1
@@ -392,7 +407,7 @@ initTvChannels tv ls = do
         row <- listStoreGetValue ls i
         return $ toLower str `isPrefixOf` toLower (show row)
 
-    return ()
+    return (renderer1)
 
 
 setChannels :: DrumkitPage -> [Microphones] -> IO ()
@@ -500,6 +515,33 @@ setupCallbacks gui = do
                 displayErrorBox (guiDkParentWindow gui) "Drumkit name is not allowed to contain spaces"
                 return ()
             else return ()
+
+    -- right click on the channel view shows the popup for add/remove
+    void $ G.on (guiTvChannels gui) buttonPressEvent $ do
+        bt <- eventButton
+        case bt of
+            RightButton -> do
+                liftIO $ menuPopup (guiChannelMenu gui) Nothing
+                return True
+            _ -> return False
+
+    -- edit call back for editing the channels
+    void $ G.on (guiChannelRenderer gui) edited $ \[i] str -> do
+        oldVal <- listStoreGetValue (guiTvChannelsModel gui) i
+        let res = validateMic str
+        case res of
+            Left err -> displayErrorBox (guiDkParentWindow gui) err
+            Right x -> do
+                -- set the GTK list store to the new value
+                listStoreSetValue (guiTvChannelsModel gui) i x
+                -- now loop over every channel map and update it with the new microphone
+                insts <- listStoreToList (guiTvInstrumentsModel gui)
+                let newInsts = map (cmChangeChannel (pack (showMic oldVal)) (pack (showMic x))) insts
+                setListStoreTo (guiTvInstrumentsModel gui) newInsts
+                -- clear the channel map view, so the user has to reactivate it
+                listStoreClear (guiTvChannelMapModel gui)
+
+
 
 
 exportDrumKit :: DrumkitPage -> IO ()
@@ -622,3 +664,16 @@ compileDrumkit gui = do
 
             setMidiMap (guiMidiMapGM gui) midimap
             setMidiMap (guiMidiMapDef gui) midimap
+
+
+addChannel :: DrumkitPage -> IO ()
+addChannel gui = do
+    let def = Undefined
+    idx <- listStoreAppend (guiTvChannelsModel gui) def
+    treeViewSetCursor (guiTvChannels gui) [idx] Nothing
+    activateRow (guiTvChannels gui) idx
+
+
+removeChannel :: DrumkitPage -> IO ()
+removeChannel gui = return ()
+
