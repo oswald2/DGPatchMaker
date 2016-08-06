@@ -28,7 +28,8 @@ displayInfoBox parentWindow txt = do
 
 cropText :: Text -> Text
 cropText txt =
-    if T.length txt > 400 then T.take 400 txt `append` "..." else txt
+    let len = 1024 in
+    if T.length txt > len then T.take len txt `append` "..." else txt
 
 
 clearNotebook :: Notebook -> IO ()

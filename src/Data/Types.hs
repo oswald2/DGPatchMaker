@@ -23,7 +23,7 @@ data ChannelMap = ChannelMap {
     cmName :: !Text,
     cmGroup :: Maybe Text,
     cmFile :: !FilePath,
-    cmType :: !Instrument,
+    cmType :: Maybe Instrument,
     cmMap :: [(Text, Text)],
     cmContainsUndefined :: Bool
 } deriving (Show)
@@ -117,7 +117,7 @@ getMic = hMicType
 data InstrumentFile = InstrumentFile {
     ifVersion :: !Text,
     ifName :: !Text,
-    ifType :: !Instrument,
+    ifType :: Maybe Instrument,
     ifSamples :: [HitSample]
 } deriving Show
 
@@ -326,11 +326,11 @@ generateDrumkit name description ifl = res
 
 instrumentFileToChannelMap :: InstrumentFile -> ChannelMap
 instrumentFileToChannelMap ifl =
-    ChannelMap (ifName ifl) grp filePath (ifType ifl) chans (cmCheckUndefined chans)
+    ChannelMap (ifName ifl) (grp (ifType ifl)) filePath (ifType ifl) chans (cmCheckUndefined chans)
     where
         filePath = "Instruments" </> unpack (ifName ifl) <.> "xml"
-        grp | ifType ifl == HiHat = Just "hihat"
-            | otherwise = Nothing
+        grp (Just t) | t == HiHat = Just "hihat"
+        grp _ = Nothing
         chans' = getAvailableChannelsIF ifl S.empty
         chans = Prelude.map (\x -> (x, x)) . Prelude.map (pack . showMic) $ toAscList chans'
 
@@ -356,7 +356,8 @@ getInstrumentNames dk = Prelude.map cmName $ dkInstruments dk
 getMidiMap :: Drumkit -> MidiMap
 getMidiMap dk = MidiMap (sortOn fst (Prelude.map f (dkInstruments dk)))
     where
-        f inst = (getMidiNoteFromInstrument (cmType inst), cmName inst)
+        f (ChannelMap {cmName = name, cmType = (Just t)}) = (getMidiNoteFromInstrument t, name)
+        f cm = (0, cmName cm)
 
 
 

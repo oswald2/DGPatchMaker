@@ -34,6 +34,7 @@ import Data.IORef
 import Data.Checkers
 import Data.Drumgizmo
 import Data.Export
+import Data.Import
 import Data.Maybe
 import Data.Char (isSpace)
 import Data.Either
@@ -115,6 +116,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
     spinAttack <- builderGetObject builder castToSpinButton ("spinbuttonAttack" :: Text)
     spinSpread <- builderGetObject builder castToSpinButton ("spinbuttonSpread" :: Text)
     calcHitB <- builderGetObject builder castToButton ("buttonCalcHits" :: Text)
+    loadInst <- builderGetObject builder castToButton ("buttonLoadInstrument" :: Text)
 
     hsls <- listStoreNew []
     (rendererHPName, rendererHP) <- initTreeViewHit treeviewHit hsls
@@ -174,6 +176,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
     void $ on treeviewHit dragDataReceived $ dragDataReceivedSignalHit gui
 
     void $ on calcHitB buttonActivated (calcPower gui)
+    void $ on loadInst buttonActivated (loadInstrument gui)
 
     -- setup the local callbacks for the treeviews
     setupCallbacks gui
@@ -571,7 +574,7 @@ instrumentPageSetInstrumentFile instPage instrumentFile = do
 
     entrySetText (guiEntryVersion instPage) (ifVersion instrumentFile)
     entrySetText (guiEntryName instPage) (ifName instrumentFile)
-    entrySetText (guiEntryType instPage) ((pack.show.ifType) instrumentFile)
+    entrySetText (guiEntryType instPage) (maybe "" (pack . show) (ifType instrumentFile))
 
     let model = guiInstHitViewModel instPage
 
@@ -631,7 +634,7 @@ setupCallbacks instPage = do
         -- set the GTK list store to the new value
         listStoreSetValue (guiInstHitViewModel instPage) i (val {hsName = res})
 
-
+    -- callback for editing the channel
     void $ on (guiRendererChan instPage) edited $ \[i] str -> do
         val <- listStoreGetValue (guiInstSamplesViewModel instPage) i
         let res = validateMic str
@@ -655,9 +658,10 @@ setupCallbacks instPage = do
                         listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
                     _ -> return ()
 
+    -- callback for editing the file channel
     void $ on (guiRendererFileChan instPage) edited $ \[i] str -> do
         val <- listStoreGetValue (guiInstSamplesViewModel instPage) i
-        let res = validate str
+        let res = validate "FileChannel" str
         case res of
             Left err -> displayErrorBox (guiMainWindow instPage) err
             Right x -> do
@@ -676,6 +680,8 @@ setupCallbacks instPage = do
                     hsVal' = hsVal {hsSamples = samples'}
                 listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
 
+    -- callback for setting up the combo box renderer used for setting the channel
+    -- Unfortunately this is necessary for GTK3 as it otherwise doesn't work
     void $ on (guiRendererChan instPage) editingStarted $ \widget treepath -> do
         case treepath of
             [_] -> do
@@ -809,7 +815,7 @@ getInstrumentFromGUI instPage = do
     T.putStrLn $ name `append` " Type: " `append` t
 
     let version = dgDefaultVersion
-        t' = validate t
+        t' = validate "Type" t
 
     case t' of
         Left err  -> return $ Left err
@@ -846,11 +852,9 @@ instrumentPageWriteInstrumentFile instPage = do
 
             let
                 dgInstrumentsPath = getInstrumentDir basepath
-                --content = convertToInstrumentXML instrumentFile
                 filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
 
             writeInstrumentXML instrumentFile filename
-            --B.writeFile filename content
 
             return $ Right filename
 
@@ -864,18 +868,18 @@ validateName instPage = do
 
 
 
-validate :: Read a => Text -> (Either Text a)
-validate input = do
+validate :: Read a => Text -> Text -> (Either Text a)
+validate msg input = do
     let maybeRead = (fmap fst . listToMaybe . reads) (unpack input)
     case maybeRead of
         Just x -> Right x
-        Nothing -> Left ("Illegal input: '" `append` input `append` "'")
+        Nothing -> Left ("Illegal input for " `append` msg `append` "'" `append` input `append` "'")
 
 
 validateType :: InstrumentPage -> IO ()
 validateType instPage = do
     t <- entryGetText (guiEntryType instPage)
-    let r = validate t
+    let r = validate "Type" t
     case r of
         Left err -> displayErrorBox (guiMainWindow instPage) (err `append` allowedTypes)
         Right x -> do
@@ -883,7 +887,7 @@ validateType instPage = do
             case iF of
                 Nothing -> return ()
                 Just instF -> do
-                    let !iF' = instF {ifType = x}
+                    let !iF' = instF {ifType = Just x}
                     writeIORef (guiInstFile instPage) (Just iF')
     where
         allowedTypes = "\nAllowedTypes:\n\nKick, Snare, HiHat, Tom TomType, Cymbal, Ride, Shaker, Tambourine\n where TomType is either: RackTom <n> or Floor <n>"
@@ -983,5 +987,51 @@ calcPower gui = do
                 s = spread / 1000
                 f = VS.foldl' (\a b -> a + b * b) 0.0 . VS.take attack
 
+
+loadInstrument :: InstrumentPage -> IO ()
+loadInstrument gui = do
+    f <- getXMLFile gui
+    case f of
+        Nothing -> return ()
+        Just fname -> do
+            ifr <- importInstrumentFile fname
+            case ifr of
+                Left err -> displayErrorBox (guiMainWindow gui) $ "Could not load the file:" `append` (pack fname) `append` ":\n" `append` err
+                Right iF -> do
+                    instrumentPageSetInstrumentFile gui iF
+
+
+
+
+getXMLFile :: InstrumentPage -> IO (Maybe FilePath)
+getXMLFile gui = do
+    let parentWindow = guiMainWindow gui
+
+    dialog <- fileChooserDialogNew
+                (Just $ ("Load Instrument File" :: Text))             --dialog title
+                (Just parentWindow)                     --the parent window
+                FileChooserActionOpen                         --the kind of dialog we want
+                [("gtk-cancel"                                --The buttons to display
+                 ,ResponseCancel)
+                 ,("gtk-open"
+                 , ResponseAccept)]
+
+    basedir <- entryGetText (guiIPEntryBaseDir gui) :: IO Text
+    let dgdir = getDrumgizmoDir (unpack basedir)
+
+    void $ fileChooserSetCurrentFolder dialog dgdir
+
+    xmlFilter <- fileFilterNew
+    fileFilterSetName xmlFilter ("XML" :: Text)
+    fileFilterAddPattern xmlFilter ("*.xml" :: Text)
+    fileChooserSetFilter dialog xmlFilter
+
+    widgetShow dialog
+    resp <- dialogRun dialog
+    res <- case resp of
+        ResponseAccept -> fileChooserGetFilename dialog
+        _ -> return Nothing
+    widgetHide dialog
+    return res
 
 
