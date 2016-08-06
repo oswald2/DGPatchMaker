@@ -437,9 +437,16 @@ initTvInstruments tv ls = do
     cellLayoutPackStart col2 renderer2 True
     cellLayoutPackStart col3 renderer3 True
 
-    cellLayoutSetAttributes col1 renderer1 ls $ \cm -> [ cellText := cmName cm]
-    cellLayoutSetAttributes col2 renderer2 ls $ \cm -> [ cellText := maybe "--" id (cmGroup cm)]
-    cellLayoutSetAttributes col3 renderer3 ls $ \cm -> [ cellText := cmFile cm]
+    cellLayoutSetAttributes col1 renderer1 ls $ \cm -> [ cellText := cmName cm,
+            cellTextBackgroundColor := yellow,
+            cellTextBackgroundSet := cmContainsUndefined cm]
+    cellLayoutSetAttributes col2 renderer2 ls $ \cm -> [ cellText := maybe "--" id (cmGroup cm),
+            cellTextBackgroundColor := yellow,
+            cellTextBackgroundSet := cmContainsUndefined cm]
+    cellLayoutSetAttributes col3 renderer3 ls $ \cm -> [ cellText := cmFile cm,
+            cellTextBackgroundColor := yellow,
+            cellTextBackgroundSet := cmContainsUndefined cm]
+
 
     _ <- treeViewAppendColumn tv col1
     _ <- treeViewAppendColumn tv col2
@@ -535,11 +542,16 @@ setupCallbacks gui = do
                 -- set the GTK list store to the new value
                 listStoreSetValue (guiTvChannelsModel gui) i x
                 -- now loop over every channel map and update it with the new microphone
-                insts <- listStoreToList (guiTvInstrumentsModel gui)
-                let newInsts = map (cmChangeChannel (pack (showMic oldVal)) (pack (showMic x))) insts
-                setListStoreTo (guiTvInstrumentsModel gui) newInsts
+                mapInsts gui (cmChangeChannel (pack (showMic oldVal)) (pack (showMic x)))
                 -- clear the channel map view, so the user has to reactivate it
                 listStoreClear (guiTvChannelMapModel gui)
+
+
+mapInsts :: DrumkitPage -> (ChannelMap -> ChannelMap) -> IO ()
+mapInsts gui f = do
+    insts <- listStoreToList (guiTvInstrumentsModel gui)
+    let newInsts = map (cmUpdateIfUndefined . f) insts
+    setListStoreTo (guiTvInstrumentsModel gui) newInsts
 
 
 
@@ -675,5 +687,19 @@ addChannel gui = do
 
 
 removeChannel :: DrumkitPage -> IO ()
-removeChannel gui = return ()
+removeChannel gui = do
+    sel <- treeViewGetSelection (guiTvChannels gui)
+    path <- treeSelectionGetSelectedRows sel
+    case path of
+        ((idx:_) : _) -> do
+            chan <- listStoreGetValue (guiTvChannelsModel gui) idx
+            listStoreRemove (guiTvChannelsModel gui) idx
+            let def = pack (showMic Undefined)
+                val = pack (showMic chan)
+            -- now loop over every channel map and update it with the new microphone
+            mapInsts gui (cmChangeChannel val def)
+            -- clear the channel map view, so the user has to reactivate it
+            listStoreClear (guiTvChannelMapModel gui)
+        _ -> return ()
+
 

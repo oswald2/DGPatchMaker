@@ -24,7 +24,8 @@ data ChannelMap = ChannelMap {
     cmGroup :: Maybe Text,
     cmFile :: !FilePath,
     cmType :: !Instrument,
-    cmMap :: [(Text, Text)]
+    cmMap :: [(Text, Text)],
+    cmContainsUndefined :: Bool
 } deriving (Show)
 
 data MidiMap = MidiMap {
@@ -325,7 +326,7 @@ generateDrumkit name description ifl = res
 
 instrumentFileToChannelMap :: InstrumentFile -> ChannelMap
 instrumentFileToChannelMap ifl =
-    ChannelMap (ifName ifl) grp filePath (ifType ifl) chans
+    ChannelMap (ifName ifl) grp filePath (ifType ifl) chans (cmCheckUndefined chans)
     where
         filePath = "Instruments" </> unpack (ifName ifl) <.> "xml"
         grp | ifType ifl == HiHat = Just "hihat"
@@ -403,3 +404,12 @@ cmChangeChannel oldName newName cm = cm {cmMap = chans }
         chans = Prelude.map chg (cmMap cm)
         chg (inC, outC) | outC == oldName = (inC, newName)
                         | otherwise = (inC, outC)
+
+cmCheckUndefined :: [(Text, Text)] -> Bool
+cmCheckUndefined = Prelude.any (== True) . Prelude.map ((== (pack (show Undefined))) . snd)
+
+cmUpdateIfUndefined :: ChannelMap -> ChannelMap
+cmUpdateIfUndefined cm = newCm
+    where
+        newCm = cm {cmContainsUndefined = val }
+        val = cmCheckUndefined (cmMap cm)

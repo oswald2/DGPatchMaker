@@ -645,13 +645,15 @@ setupCallbacks instPage = do
 
                 sel <- treeViewGetSelection (guiInstHitView instPage)
                 path <- treeSelectionGetSelectedRows sel
-                let idx = P.head (P.head path)
-                hsVal <- listStoreGetValue (guiInstHitViewModel instPage) idx
-                let samples = hsSamples hsVal
-                    samples' = fmap upd samples
-                    upd s = if s == val then val' else s
-                    hsVal' = hsVal {hsSamples = samples'}
-                listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
+                case path of
+                    ((idx:_) : _) -> do
+                        hsVal <- listStoreGetValue (guiInstHitViewModel instPage) idx
+                        let samples = hsSamples hsVal
+                            samples' = fmap upd samples
+                            upd s = if s == val then val' else s
+                            hsVal' = hsVal {hsSamples = samples'}
+                        listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
+                    _ -> return ()
 
     void $ on (guiRendererFileChan instPage) edited $ \[i] str -> do
         val <- listStoreGetValue (guiInstSamplesViewModel instPage) i
