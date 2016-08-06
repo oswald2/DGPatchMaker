@@ -53,7 +53,10 @@ importMidiMap path = do
 
 parseAudioFile :: MonadThrow m => ConduitM Event o m (Maybe AudioFile)
 parseAudioFile = do
-    tagName "audiofile" attrs
+    tagName "audiofile" attr $ \af -> do
+        case af of
+            Just x -> return x
+            Nothing ->
     where
         attrs = do
             chan <- requireAttr "channel"
