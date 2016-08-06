@@ -2,11 +2,12 @@
 module Data.Import
     (
     importMidiMap
+    ,importInstrumentFile
     )
 where
 
 
-import Data.Text (Text, unpack)
+import Data.Text (Text, unpack, append)
 import Data.Text.Read
 import Data.Types
 import Text.XML.Stream.Parse
@@ -14,10 +15,22 @@ import Data.XML.Types
 import Data.Maybe
 import Data.Either
 
-import Data.Monoid ((<>))
+--import Data.Monoid ((<>))
 
 import Control.Monad.Trans.Resource
 import Data.Conduit
+
+import Control.Exception
+import Data.Typeable
+
+
+data DKParseException =
+    AudioFileParseError Text
+    | SampleFileParseError Text
+    deriving (Show, Typeable)
+
+instance Exception DKParseException
+
 
 
 parseMidiNote :: MonadThrow m => ConduitM Event o m (Maybe (Int, Text))
@@ -42,21 +55,27 @@ importMidiMap path = do
 
 
 
---parseInstrument :: MonadThrow m => ConduitM Event o m (Maybe InstrumentFile)
---parseInstrument =
-    --tagName "instrument" (requireAttr "version" <> requireAttr "name") $ many parseSamples
+parseInstrument :: MonadThrow m => ConduitM Event o m (Maybe InstrumentFile)
+parseInstrument =
+    tagName "instrument" ((,) <$> requireAttr "version" <*> requireAttr "name") $ \(version, name) -> do
+        smpls <- many parseSamples
+        return (InstrumentFile version name Nothing smpls)
 
---parseSamples :: MonadThrow m => ConduitM Event o m (Maybe HitSample)
---parseSamples =
-    --tagName "sample" (requireAttr "name" <> requireAttr "power") $ many parseAudioFile
+parseSamples :: MonadThrow m => ConduitM Event o m (Maybe HitSample)
+parseSamples =
+    tagName "sample" ((,) <$> requireAttr "name" <*> requireAttr "power") $ \(name, power) -> do
+        af <- many parseAudioFile
+        let p = double power
+        if isLeft p
+            then throwM (SampleFileParseError ("Invalid Power specified for Sample: " `append` name))
+            else do
+                let Right (x, _) = p
+                return (HitSample name x af)
 
 
 parseAudioFile :: MonadThrow m => ConduitM Event o m (Maybe AudioFile)
 parseAudioFile = do
-    tagName "audiofile" attr $ \af -> do
-        case af of
-            Just x -> return x
-            Nothing ->
+    tagName "audiofile" attrs $ \af -> return af
     where
         attrs = do
             chan <- requireAttr "channel"
@@ -66,15 +85,14 @@ parseAudioFile = do
                 filechannel' = decimal filechannel
 
             if isNothing chan' || isLeft filechannel'
-                then do
-                    return Nothing
+                then throwM (AudioFileParseError ("Invalid Channel or Filechannel for file: " `append` file))
                 else do
                     let Right (x, _) = filechannel'
-                    return $ Just $ AudioFile (fromJust chan') (unpack file) x
+                    return $ AudioFile (fromJust chan') (unpack file) x
 
 
---importInstrumentFile :: FilePath -> IO (Maybe InstrumentFile)
---importInstrumentFile path = do
-    --iF <- runResourceT $
-        --parseFile def path $$ parseAudioFile
-    --return iF
+importInstrumentFile :: FilePath -> IO (Maybe InstrumentFile)
+importInstrumentFile path = do
+    iF <- runResourceT $
+        parseFile def path $$ parseInstrument
+    return iF

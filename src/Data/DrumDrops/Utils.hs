@@ -125,7 +125,7 @@ determineChannel parserType sample channel =
 
 convertSampleGroup :: ParserType -> FilePath -> SampleGroup -> InstrumentFile
 convertSampleGroup parserType basepath sg =
-    InstrumentFile dgDefaultVersion nm (sgInstrument sg) groups
+    InstrumentFile dgDefaultVersion nm (Just (sgInstrument sg)) groups
     where
         nm = sgInstName sg
         vname :: Int -> Text
