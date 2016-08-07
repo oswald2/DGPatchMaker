@@ -15,6 +15,7 @@ import Data.Vector as V
 import Gtk.MainWindow
 import Gtk.InstrumentFrame
 import Gtk.Drumkit
+import Gtk.FileHandlingDialog
 
 import Gtk.DGPatchMakerBuilder
 
@@ -47,10 +48,12 @@ initMainWindow = do
 
     combo <- builderGetObject builder castToComboBox ("comboboxParser" :: Text)
 
+    fhDialog <- initFileHandlingDialog builder
+
     instPages <- newIORef (V.empty)
 
     -- initialise the drumkit page
-    drumkitPage <- initDrumkitPage window builder notebookInstruments progress combo entryBaseDirectory entrySamplesDir instPages
+    drumkitPage <- initDrumkitPage window builder notebookInstruments progress combo entryBaseDirectory entrySamplesDir instPages fhDialog
 
     let gui = MainWindow {
         guiWindow = window,
@@ -65,7 +68,7 @@ initMainWindow = do
 
     void $ on buttonNewInstrument buttonActivated $ do
         let name = "NewInstrument" :: Text
-        ins <- instrumentPageNew window notebookInstruments entryBaseDirectory entrySamplesDir combo instPages
+        ins <- instrumentPageNew window notebookInstruments entryBaseDirectory entrySamplesDir combo instPages fhDialog
         i <- notebookAppendPage notebookInstruments (instrumentPageGetMainBox ins) name
         instrumentPageInsert ins
         notebookSetCurrentPage notebookInstruments i

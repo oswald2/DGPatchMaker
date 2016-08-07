@@ -29,7 +29,13 @@ import Control.Monad.Trans.Resource
 
 writeInstrumentXML :: InstrumentFile -> FilePath -> IO ()
 writeInstrumentXML iF filename = do
-    runResourceT $ conduitInstrumentXML iF C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
+    runResourceT $ conduitInstrumentSource iF C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
+
+
+conduitInstrumentSource :: Monad m => InstrumentFile -> C.Source m Event
+conduitInstrumentSource iF = do
+    C.yield EventBeginDocument
+    conduitInstrumentXML iF
 
 
 conduitInstrumentXML :: Monad m => InstrumentFile -> C.Source m Event
@@ -61,9 +67,15 @@ conduitMidiMap (MidiMap mp) =
         noteEntries = foldr f mempty mp
         f (note, instr) b = (tag "map" (attr "note" (pack (show note)) <> attr "instr" instr) mempty) <> b
 
+conduitFullMidiMap :: Monad m => MidiMap -> C.Source m Event
+conduitFullMidiMap mm = do
+    C.yield EventBeginDocument
+    conduitMidiMap mm
+
+
 writeMidiMapXML :: MidiMap -> FilePath -> IO ()
 writeMidiMapXML mp filename = do
-    runResourceT $ conduitMidiMap mp C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
+    runResourceT $ conduitFullMidiMap mp C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
 
 
 
@@ -81,9 +93,15 @@ conduitDrumKitXML dr =
         channelmap x = foldr chm mempty (cmMap x)
         chm (c1, c2) b = tag "channelmap" (attr "in" c1 <> attr "out" c2) mempty <> b
 
+conduitFullDrumKit :: Monad m => Drumkit -> C.Source m Event
+conduitFullDrumKit dr = do
+    C.yield EventBeginDocument
+    conduitDrumKitXML dr
+
+
 writeDrumKitXML :: Drumkit -> FilePath -> IO ()
 writeDrumKitXML dr filename = do
-    runResourceT $ conduitDrumKitXML dr C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
+    runResourceT $ conduitFullDrumKit dr C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
 
 
 convertToTabSep :: MidiMap -> L.Text

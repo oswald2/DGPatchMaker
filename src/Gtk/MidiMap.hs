@@ -27,6 +27,7 @@ import Graphics.UI.Gtk as G
 
 import Gtk.Colors
 import Gtk.Utils
+import Gtk.FileHandlingDialog
 
 import System.FilePath
 
@@ -40,7 +41,8 @@ data MidiMapPage = MidiMapPage {
     mmNoteRenderer :: CellRendererText,
     mmLoadMap :: Button,
     mmExportMap :: Button,
-    mmBasePath :: Entry
+    mmBasePath :: Entry,
+    mmFhDialog :: FileHandlingDialog
 }
 
 
@@ -57,8 +59,8 @@ instance Ord MidiMapItem where
     compare x1 x2 = compare (mmiNote x1) (mmiNote x2)
 
 
-initMidiMap :: Window -> TreeView -> Entry -> Button -> Button -> IO MidiMapPage
-initMidiMap window tv basepath loadButton exportButton = do
+initMidiMap :: Window -> TreeView -> Entry -> Button -> Button -> FileHandlingDialog -> IO MidiMapPage
+initMidiMap window tv basepath loadButton exportButton fhDialog = do
 
     ls <- listStoreNew []
 
@@ -71,7 +73,8 @@ initMidiMap window tv basepath loadButton exportButton = do
             mmNoteRenderer = rend,
             mmLoadMap = loadButton,
             mmExportMap = exportButton,
-            mmBasePath = basepath
+            mmBasePath = basepath,
+            mmFhDialog = fhDialog
         }
 
     setupCallbacks gui
@@ -301,13 +304,12 @@ writeMidiMapFile gui filename midimap = do
 writeMidiMapFile' :: MidiMapPage -> Text -> MidiMap -> IO ()
 writeMidiMapFile' gui filename midimap = do
     basepath <- entryGetText (mmBasePath gui)
-    let --content = convertToMidiMapXML midimap
+    let
         content2 = convertToTabSep midimap
         path = getDrumgizmoDir basepath </> unpack filename
         path2 = replaceExtension path ".txt"
 
-    --B.writeFile path content
-    writeMidiMapXML midimap path
+    askUserForOverwriteIfNecessary (mmFhDialog gui) path $ writeMidiMapXML midimap path
     L.writeFile path2 content2
 
 

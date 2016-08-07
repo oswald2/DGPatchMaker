@@ -56,10 +56,15 @@ importMidiMap path = do
 
 
 parseInstrument :: MonadThrow m => ConduitM Event o m (Maybe InstrumentFile)
-parseInstrument =
-    tagName "instrument" ((,) <$> requireAttr "version" <*> requireAttr "name") $ \(version, name) -> do
-        smpls <- many parseSamples
-        return (InstrumentFile version name Nothing smpls)
+parseInstrument = do
+    inst <- tagName "instrument" ((,) <$> requireAttr "version" <*> requireAttr "name") $
+        \(version, name) -> do
+            smpls <- tagNoAttr "samples" $ many parseSamples
+            return (version, name, smpls)
+    case inst of
+        Just (vers, nam, Just smpl) -> return $ Just (InstrumentFile vers nam Nothing smpl)
+        _ -> return Nothing
+
 
 
 parseSamples :: MonadThrow m => ConduitM Event o m (Maybe HitSample)

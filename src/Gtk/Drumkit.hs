@@ -33,7 +33,7 @@ import Gtk.Colors
 import Gtk.InstrumentFrame
 import Gtk.ErrorDialog
 import Gtk.MidiMap
-
+import Gtk.FileHandlingDialog
 
 
 data DrumkitPage = DrumkitPage {
@@ -60,7 +60,8 @@ data DrumkitPage = DrumkitPage {
     guiMidiMapDef :: MidiMapPage,
     guiParserCombo :: ComboBox,
     guiChannelMenu :: Menu,
-    guiChannelRenderer :: CellRendererText
+    guiChannelRenderer :: CellRendererText,
+    guiFhDialog :: FileHandlingDialog
 }
 
 
@@ -72,8 +73,9 @@ initDrumkitPage :: Window ->
                     Entry ->
                     Entry ->
                     IORef (Vector InstrumentPage) ->
+                    FileHandlingDialog ->
                     IO DrumkitPage
-initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir ioref = do
+initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir ioref fhDialog = do
 
     buttonImportDrumkit <- builderGetObject builder castToButton ("buttonImportDrumkit" :: Text)
     buttonExportDrumkit <- builderGetObject builder castToButton ("buttonExportDrumkit" :: Text)
@@ -116,8 +118,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     resetButton <- builderGetObject builder castToButton ("buttonReset" :: Text)
     compileButton <- builderGetObject builder castToButton ("buttonCompile" :: Text)
 
-    midiMapGm <- initMidiMap mainWindow tvMidiGM entryBaseDirectory gmLoadButton gmExportButton
-    midiMapDef <- initMidiMap mainWindow tvMidiDef entryBaseDirectory defLoadButton defExportButton
+    midiMapGm <- initMidiMap mainWindow tvMidiGM entryBaseDirectory gmLoadButton gmExportButton fhDialog
+    midiMapDef <- initMidiMap mainWindow tvMidiDef entryBaseDirectory defLoadButton defExportButton fhDialog
 
     initParserCombo combo
 
@@ -150,7 +152,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
             guiMidiMapDef = midiMapDef,
             guiParserCombo = combo,
             guiChannelMenu = channelMenu,
-            guiChannelRenderer = channelRenderer
+            guiChannelRenderer = channelRenderer,
+            guiFhDialog = fhDialog
         }
 
     setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
@@ -333,7 +336,7 @@ importDrumDropsDrumKit' gui = do
 
         doSingleImport progress basedir samplesDir step path = do
             ins <- instrumentPageNew (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
-                (guiBaseDir gui) (guiSamplesDir gui) (guiParserCombo gui) (guiDkInstrumentPages gui)
+                (guiBaseDir gui) (guiSamplesDir gui) (guiParserCombo gui) (guiDkInstrumentPages gui) (guiFhDialog gui)
             let instName = pathToInstrument samplesDir path
             _ <- notebookAppendPage (guiDkInstrumentsNotebook gui) (instrumentPageGetMainBox ins) instName
             instrumentPageInsert ins
@@ -565,14 +568,14 @@ exportDrumKit gui = do
             nm <- getDkName gui
             case null nm of
                 True -> displayErrorBox (guiDkParentWindow gui) "No drumkit name specified!"
-                False -> do
-                    writeDrumKitFile gui nm basepath
-                    -- get the midi map and write it
-                    gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
-                    defMidi <- getMidiMapFromGUI (guiMidiMapDef gui)
+                False -> withFileHandlingDialog (guiFhDialog gui) $ do
+                            writeDrumKitFile gui nm basepath
+                            -- get the midi map and write it
+                            gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
+                            defMidi <- getMidiMapFromGUI (guiMidiMapDef gui)
 
-                    writeMidiMapFile (guiMidiMapGM gui) "MIDIMap_GM.xml" gmMidi
-                    writeMidiMapFile (guiMidiMapDef gui) "MIDIMap_Default.xml" defMidi
+                            writeMidiMapFile (guiMidiMapGM gui) "MIDIMap_GM.xml" gmMidi
+                            writeMidiMapFile (guiMidiMapDef gui) "MIDIMap_Default.xml" defMidi
 
 
 
@@ -600,17 +603,19 @@ writeDrumKitFile' gui nm basepath = do
                     insts <- listStoreToList (guiTvInstrumentsModel gui)
                     basedir <- entryGetText (guiBaseDir gui)
                     let d' = d {dkName = nm, dkDescription = desc, dkChannels = channels, dkInstruments = insts}
-                        --drumkitCont = convertToDrumkitXML d'
                         dgPath = getDrumgizmoDir basedir
                         drumkitFName = dgPath </> unpack nm <.> ".xml"
 
                     writeIORef (guiDrumkit gui) (Just d')
 
-                    writeDrumKitXML d' drumkitFName
-                    --B.writeFile drumkitFName drumkitCont
+                    askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
 
                     -- also export the instrument files
                     exportInstruments gui
+
+
+
+
 
 
 exportInstruments :: DrumkitPage -> IO ()

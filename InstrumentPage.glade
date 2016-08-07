@@ -243,6 +243,7 @@
               <object class="GtkEntry" id="entryType">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <property name="primary_icon_tooltip_text" translatable="yes">Specifies the instrument type. This helps the editor to automatically set some values as well as groups (e.g. Hi Hat). Valid types are: Kick, Snare, HiHat, Tom (RackTom &lt;n&gt;), Tom (Floor &lt;n&gt;), Cymbal, Ride, Shaker, Tambourine.</property>
               </object>
               <packing>
                 <property name="expand">False</property>

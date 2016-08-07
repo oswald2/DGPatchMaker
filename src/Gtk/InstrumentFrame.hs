@@ -24,7 +24,7 @@ import Graphics.UI.Gtk
 
 import Gtk.Colors
 import Gtk.Utils
-
+import Gtk.FileHandlingDialog
 
 import Data.Text as T
 import Data.Text.IO as T
@@ -79,14 +79,15 @@ data InstrumentPage = InstrumentPage {
     guiIPParserCombo :: ComboBox,
     guiHitSamplesMenu :: Menu,
     guiSpinAttack :: SpinButton,
-    guiSpinSpread :: SpinButton
+    guiSpinSpread :: SpinButton,
+    guiInstFhDialog :: FileHandlingDialog
     }
 
 
 
 
-instrumentPageNew :: Window -> Notebook -> Entry -> Entry -> ComboBox -> IORef (V.Vector InstrumentPage) -> IO InstrumentPage
-instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
+instrumentPageNew :: Window -> Notebook -> Entry -> Entry -> ComboBox -> IORef (V.Vector InstrumentPage) -> FileHandlingDialog -> IO InstrumentPage
+instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
@@ -149,7 +150,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref = do
         guiHitSamplesMenu = hitPopUp,
         guiRendererHPName = rendererHPName,
         guiSpinAttack = spinAttack,
-        guiSpinSpread = spinSpread
+        guiSpinSpread = spinSpread,
+        guiInstFhDialog = fhDialog
         }
 
     -- set the default values for this instrument page
@@ -818,9 +820,11 @@ getInstrumentFromGUI instPage = do
         t' = validate "Type" t
 
     case t' of
-        Left err  -> return $ Left err
+        Left err  -> do
+            let res = InstrumentFile version name Nothing samples
+            return (Right res)
         Right typ -> do
-            let res = InstrumentFile version name typ samples
+            let res = InstrumentFile version name (Just typ) samples
             return (Right res)
 
 
@@ -832,7 +836,12 @@ storeInstrument instPage instFile = do
 
 exportInstrument :: InstrumentPage -> IO ()
 exportInstrument instPage = do
-    res <- instrumentPageWriteInstrumentFile instPage
+    -- this function is only called from the InstrumentPage GUI and therefore we have out own
+    -- file overwrite handling dialog, so we reset it here
+    -- If the whole drumkit is exported, the withFileHandlingDialog will be called
+    -- from the DrumkitPage and therefore have the correct scope for the
+    -- whole export
+    res <- withFileHandlingDialog (guiInstFhDialog instPage) $ instrumentPageWriteInstrumentFile instPage
     case res of
         Left err -> displayErrorBox (guiMainWindow instPage) ("Error during export: " `append` err)
         Right filename -> displayInfoBox (guiMainWindow instPage)
@@ -854,7 +863,7 @@ instrumentPageWriteInstrumentFile instPage = do
                 dgInstrumentsPath = getInstrumentDir basepath
                 filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
 
-            writeInstrumentXML instrumentFile filename
+            askUserForOverwriteIfNecessary (guiInstFhDialog instPage) filename $ writeInstrumentXML instrumentFile filename
 
             return $ Right filename
 
@@ -873,7 +882,7 @@ validate msg input = do
     let maybeRead = (fmap fst . listToMaybe . reads) (unpack input)
     case maybeRead of
         Just x -> Right x
-        Nothing -> Left ("Illegal input for " `append` msg `append` "'" `append` input `append` "'")
+        Nothing -> Left ("Illegal input for " `append` msg `append` " '" `append` input `append` "'")
 
 
 validateType :: InstrumentPage -> IO ()
