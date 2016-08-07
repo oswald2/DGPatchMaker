@@ -414,3 +414,7 @@ cmUpdateIfUndefined cm = newCm
     where
         newCm = cm {cmContainsUndefined = val }
         val = cmCheckUndefined (cmMap cm)
+
+
+cmAnyUndefined :: ChannelMap -> Bool
+cmAnyUndefined cm = cmCheckUndefined (cmMap cm)

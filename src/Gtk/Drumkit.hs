@@ -705,6 +705,25 @@ removeChannel gui = do
             mapInsts gui (cmChangeChannel val def)
             -- clear the channel map view, so the user has to reactivate it
             listStoreClear (guiTvChannelMapModel gui)
+
+            -- if we have removed the Undefined and we still have some
+            -- undefined channels, we need to add it again
+            addUndefinedIfNeeded gui
+
         _ -> return ()
+
+
+addUndefinedIfNeeded :: DrumkitPage -> IO ()
+addUndefinedIfNeeded gui = do
+    insts <- listStoreToList (guiTvInstrumentsModel gui)
+    let undef = filter cmAnyUndefined insts
+    when (not (null undef)) $ do
+        ls <- listStoreToList (guiTvChannelsModel gui)
+        case ClassyPrelude.find (== Undefined) ls of
+            Nothing -> addChannel gui  -- if we don't find Undefined and we need it
+                                       -- because there are undefined channel mappings
+                                       -- we have to re-add it
+            Just _ -> return ()
+
 
 
