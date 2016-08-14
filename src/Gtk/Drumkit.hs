@@ -22,7 +22,7 @@ import Data.Either
 
 import qualified Data.Vector as V
 
-import qualified Data.Text as T
+--import qualified Data.Text as T
 --import Data.IORef
 import qualified Data.Set as S
 
@@ -50,7 +50,7 @@ data DrumkitPage = DrumkitPage {
     guiTvChannels :: TreeView,
     guiTvInstruments :: TreeView,
     guiTvChannelMap :: TreeView,
-    guiTvChannelsModel :: ListStore Microphones,
+    guiTvChannelsModel :: ListStore Text,
     guiTvInstrumentsModel :: ListStore ChannelMap,
     guiTvChannelMapModel :: ListStore (Text, Text),
     guiDrumkit :: IORef (Maybe Drumkit),
@@ -61,7 +61,9 @@ data DrumkitPage = DrumkitPage {
     guiParserCombo :: ComboBox,
     guiChannelMenu :: Menu,
     guiChannelRenderer :: CellRendererText,
-    guiFhDialog :: FileHandlingDialog
+    guiFhDialog :: FileHandlingDialog,
+    guiOutChannelRenderer :: CellRendererCombo,
+    guiGroupRenderer :: CellRendererText
 }
 
 
@@ -101,8 +103,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     dr <- newIORef Nothing
 
     channelRenderer <- initTvChannels tvChannels lsm
-    initTvInstruments tvInstruments lsinst
-    initTvChannelMap tvChannelMap lscm
+    groupRenderer <- initTvInstruments tvInstruments lsinst
+    outRenderer <- initTvChannelMap tvChannelMap lsm lscm
 
     entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
     entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
@@ -153,7 +155,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
             guiParserCombo = combo,
             guiChannelMenu = channelMenu,
             guiChannelRenderer = channelRenderer,
-            guiFhDialog = fhDialog
+            guiFhDialog = fhDialog,
+            guiOutChannelRenderer = outRenderer,
+            guiGroupRenderer = groupRenderer
         }
 
     setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
@@ -379,7 +383,7 @@ getDirectoriesToImport path = do
         filterP = extension ==? ".wav"
 
 
-initTvChannels :: TreeView -> ListStore Microphones -> IO (CellRendererText)
+initTvChannels :: TreeView -> ListStore Text -> IO (CellRendererText)
 initTvChannels tv ls = do
     treeViewSetModel tv ls
 
@@ -400,7 +404,7 @@ initTvChannels tv ls = do
                     cellTextBackgroundSet := True
                     ]
 
-    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := T.pack (show hs)]
+    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := hs]
 
     _ <- treeViewAppendColumn tv col1
 
@@ -413,11 +417,11 @@ initTvChannels tv ls = do
     return (renderer1)
 
 
-setChannels :: DrumkitPage -> [Microphones] -> IO ()
+setChannels :: DrumkitPage -> [Text] -> IO ()
 setChannels gui channels = setListStoreTo (guiTvChannelsModel gui) channels
 
 
-initTvInstruments :: TreeView -> ListStore ChannelMap -> IO ()
+initTvInstruments :: TreeView -> ListStore ChannelMap -> IO (CellRendererText)
 initTvInstruments tv ls = do
     treeViewSetModel tv ls
 
@@ -435,6 +439,9 @@ initTvInstruments tv ls = do
     renderer1 <- cellRendererTextNew
     renderer2 <- cellRendererTextNew
     renderer3 <- cellRendererTextNew
+
+    set renderer2 [cellTextEditable := True,
+                    cellTextEditableSet := True]
 
     cellLayoutPackStart col1 renderer1 True
     cellLayoutPackStart col2 renderer2 True
@@ -461,14 +468,14 @@ initTvInstruments tv ls = do
         row <- listStoreGetValue ls i
         return $ toLower str `isPrefixOf` toLower (cmName row)
 
-    return ()
+    return (renderer2)
 
 setInstruments :: DrumkitPage -> [ChannelMap] -> IO ()
 setInstruments gui insts = setListStoreTo (guiTvInstrumentsModel gui) insts
 
 
-initTvChannelMap :: TreeView -> ListStore (Text, Text) -> IO ()
-initTvChannelMap tv ls = do
+initTvChannelMap :: TreeView -> ListStore Text -> ListStore (Text, Text) -> IO (CellRendererCombo)
+initTvChannelMap tv lsMicros ls = do
     treeViewSetModel tv ls
 
     treeViewSetHeadersVisible tv True
@@ -481,13 +488,30 @@ initTvChannelMap tv ls = do
     treeViewColumnSetTitle col2 ("Out" :: Text)
 
     renderer1 <- cellRendererTextNew
-    renderer2 <- cellRendererTextNew
+    renderer2 <- cellRendererComboNew
+
+    let colId :: ColumnId Text Text
+        colId = makeColumnIdString 0
+        -- in this case we take the outputs liststore
+
+    outChans <- listStoreToList lsMicros
+    lsChans <- listStoreNew outChans
+
+    treeModelSetColumn lsChans colId id
 
     cellLayoutPackStart col1 renderer1 True
     cellLayoutPackStart col2 renderer2 True
 
+    set renderer2 [ cellTextEditable := True,
+                    cellTextEditableSet := True,
+                    cellTextBackgroundColor := paleYellow,
+                    cellTextBackgroundSet := True,
+
+                    cellComboTextModel := (lsChans, colId)
+                    ]
+
     cellLayoutSetAttributes col1 renderer1 ls $ \(i, _) -> [ cellText := i]
-    cellLayoutSetAttributes col2 renderer2 ls $ \(_, o) -> [ cellText := o]
+    cellLayoutSetAttributes col2 renderer2 ls $ \(_, o) -> [ cellText := o, cellComboTextModel := (lsChans, colId)]
 
     _ <- treeViewAppendColumn tv col1
     _ <- treeViewAppendColumn tv col2
@@ -498,7 +522,7 @@ initTvChannelMap tv ls = do
         (x, _) <- listStoreGetValue ls i
         return $ toLower str `isPrefixOf` toLower x
 
-    return ()
+    return (renderer2)
 
 
 
@@ -538,16 +562,50 @@ setupCallbacks gui = do
     -- edit call back for editing the channels
     void $ G.on (guiChannelRenderer gui) edited $ \[i] str -> do
         oldVal <- listStoreGetValue (guiTvChannelsModel gui) i
-        let res = validateMic str
-        case res of
-            Left err -> displayErrorBox (guiDkParentWindow gui) err
-            Right x -> do
-                -- set the GTK list store to the new value
-                listStoreSetValue (guiTvChannelsModel gui) i x
-                -- now loop over every channel map and update it with the new microphone
-                mapInsts gui (cmChangeChannel (pack (showMic oldVal)) (pack (showMic x)))
-                -- clear the channel map view, so the user has to reactivate it
-                listStoreClear (guiTvChannelMapModel gui)
+        -- set the GTK list store to the new value
+        listStoreSetValue (guiTvChannelsModel gui) i str
+        -- now loop over every channel map and update it with the new microphone
+        mapInsts gui (cmChangeChannel oldVal str)
+        -- clear the channel map view, so the user has to reactivate it
+        listStoreClear (guiTvChannelMapModel gui)
+
+    -- callback for setting up the combo box renderer used for setting the out channel
+    -- Unfortunately this is necessary for GTK3 as it otherwise doesn't work
+    void $ G.on (guiOutChannelRenderer gui) editingStarted $ \widget treepath -> do
+        case treepath of
+            [_] -> do
+                comboListStore <- comboBoxSetModelText (castToComboBox widget)
+                outChans <- listStoreToList (guiTvChannelsModel gui)
+                void $ mapM (listStoreAppend comboListStore) (outChans :: [Text])
+                return ()
+            _ -> return ()
+
+    -- callback for editing the channel
+    void $ G.on (guiOutChannelRenderer gui) edited $ \[i] str -> do
+        val@(inc, _) <- listStoreGetValue (guiTvChannelMapModel gui) i
+        -- set the GTK list store to the new value
+        let val' = (inc, str)
+        listStoreSetValue (guiTvChannelMapModel gui) i val'
+        -- we also need to set the new value in the instrument itself
+
+        sel <- treeViewGetSelection (guiTvInstruments gui)
+        path <- treeSelectionGetSelectedRows sel
+        case path of
+            ((idx:_) : _) -> do
+                hsVal <- listStoreGetValue (guiTvInstrumentsModel gui) idx
+                let cm = cmMap hsVal
+                    cm' = fmap upd cm
+                    upd s = if s == val then val' else s
+                    hsVal' = hsVal {cmMap = cm'}
+                listStoreSetValue (guiTvInstrumentsModel gui) idx hsVal'
+            _ -> return ()
+
+    -- edit call back for editing the channels
+    void $ G.on (guiGroupRenderer gui) edited $ \[i] str -> do
+        oldVal <- listStoreGetValue (guiTvInstrumentsModel gui) i
+        -- set the GTK list store to the new value
+        let newVal = if str == "" || str == "--" then oldVal {cmGroup = Nothing} else oldVal {cmGroup = Just str}
+        listStoreSetValue (guiTvInstrumentsModel gui) i newVal
 
 
 mapInsts :: DrumkitPage -> (ChannelMap -> ChannelMap) -> IO ()
@@ -685,7 +743,7 @@ compileDrumkit gui = do
 
 addChannel :: DrumkitPage -> IO ()
 addChannel gui = do
-    let def = Undefined
+    let def = pack (showMic Undefined)
     idx <- listStoreAppend (guiTvChannelsModel gui) def
     treeViewSetCursor (guiTvChannels gui) [idx] Nothing
     activateRow (guiTvChannels gui) idx
@@ -700,7 +758,7 @@ removeChannel gui = do
             chan <- listStoreGetValue (guiTvChannelsModel gui) idx
             listStoreRemove (guiTvChannelsModel gui) idx
             let def = pack (showMic Undefined)
-                val = pack (showMic chan)
+                val = chan
             -- now loop over every channel map and update it with the new microphone
             mapInsts gui (cmChangeChannel val def)
             -- clear the channel map view, so the user has to reactivate it
@@ -719,7 +777,8 @@ addUndefinedIfNeeded gui = do
     let undef = filter cmAnyUndefined insts
     when (not (null undef)) $ do
         ls <- listStoreToList (guiTvChannelsModel gui)
-        case ClassyPrelude.find (== Undefined) ls of
+        let def = pack (showMic Undefined)
+        case ClassyPrelude.find (== def) ls of
             Nothing -> addChannel gui  -- if we don't find Undefined and we need it
                                        -- because there are undefined channel mappings
                                        -- we have to re-add it

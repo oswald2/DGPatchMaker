@@ -15,7 +15,7 @@ import qualified Data.IntMap.Strict as M
 data Drumkit = Drumkit {
     dkName :: !Text,
     dkDescription :: !Text,
-    dkChannels :: [Microphones],
+    dkChannels :: [Text],
     dkInstruments :: [ChannelMap]
 } deriving (Show)
 
@@ -319,7 +319,7 @@ generateDrumkit name description ifl = res
     where
         res = Drumkit name description channels chanMap
         channels' = getAvailableChannels ifl
-        channels = toAscList channels'
+        channels = Prelude.map (pack.showMic) $ toAscList channels'
 
         chanMap = Prelude.map instrumentFileToChannelMap ifl
 
