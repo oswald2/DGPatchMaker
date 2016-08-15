@@ -48,6 +48,7 @@ import System.FilePath
 
 import Gtk.InstrumentPageBuilder
 import Gtk.ErrorDialog
+import Gtk.NrHitsDialog
 
 import Network.URI (unEscapeString)
 
@@ -82,7 +83,8 @@ data InstrumentPage = InstrumentPage {
     guiSpinAttack :: SpinButton,
     guiSpinSpread :: SpinButton,
     guiInstFhDialog :: FileHandlingDialog,
-    guiInstErrDialog :: ErrorDialog
+    guiInstErrDialog :: ErrorDialog,
+    guiInstNrHits :: NrHitsDialog
     }
 
 
@@ -93,8 +95,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     -- Create the builder, and load the UI file
     builder <- builderNew
 
-    builderAddFromFile builder "InstrumentPage.glade"
-    --builderAddFromString builder builderFileAsString
+    --builderAddFromFile builder "InstrumentPage.glade"
+    builderAddFromString builder builderFileAsString
 
     -- Retrieve some objects from the UI
     mainBox <- builderGetObject builder castToBox ("mainBox" :: Text)
@@ -115,11 +117,14 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     hitPopUp <- builderGetObject builder castToMenu ("menuHits" :: Text)
     menuAddHitSample <- builderGetObject builder castToMenuItem ("menuitemAddHitSample" :: Text)
     menuRemoveHitSample <- builderGetObject builder castToMenuItem ("menuitemRemoveHitSample" :: Text)
+    menuAddNrHits <- builderGetObject builder castToMenuItem ("menuitemAddMultiple" :: Text)
 
     spinAttack <- builderGetObject builder castToSpinButton ("spinbuttonAttack" :: Text)
     spinSpread <- builderGetObject builder castToSpinButton ("spinbuttonSpread" :: Text)
     calcHitB <- builderGetObject builder castToButton ("buttonCalcHits" :: Text)
     loadInst <- builderGetObject builder castToButton ("buttonLoadInstrument" :: Text)
+
+    nrHitsDiag <- initNrHitsDialog builder
 
     hsls <- listStoreNew []
     (rendererHPName, rendererHP) <- initTreeViewHit treeviewHit hsls
@@ -154,7 +159,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
         guiSpinAttack = spinAttack,
         guiSpinSpread = spinSpread,
         guiInstFhDialog = fhDialog,
-        guiInstErrDialog = errDiag
+        guiInstErrDialog = errDiag,
+        guiInstNrHits = nrHitsDiag
         }
 
     -- set the default values for this instrument page
@@ -174,6 +180,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
 
     void $ on menuAddHitSample menuItemActivate (addHitPower gui)
     void $ on menuRemoveHitSample menuItemActivate (removeHitPower gui)
+    void $ on menuAddNrHits menuItemActivate (addMultipleHits gui)
 
     void $ on treeviewSamples dragDataReceived $ dragDataReceivedSignal gui
     void $ on treeviewSamples dragDataGet $ dragDataGetSignal gui
@@ -640,10 +647,10 @@ setupCallbacks instPage = do
         listStoreSetValue (guiInstHitViewModel instPage) i (val {hsName = res})
 
     -- callback for editing the channel
-    void $ on (guiRendererChan instPage) edited $ \[i] str -> do
+    void $ on (guiRendererChan instPage) edited $ \[_] stri -> do
         -- do the editing for all selected audio files
         sel1 <- treeViewGetSelection (guiInstHitView instPage)
-        hitSamplePath <- treeSelectionGetSelectedRows sel1
+        hitSampleP <- treeSelectionGetSelectedRows sel1
 
         sel <- treeViewGetSelection (guiInstSamplesView instPage)
         paths <- treeSelectionGetSelectedRows sel
@@ -671,7 +678,7 @@ setupCallbacks instPage = do
                                 listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
                             _ -> return ()
 
-        mapM_ (setSingleChannel str hitSamplePath) ((P.map P.head . P.filter (not.P.null)) paths)
+        mapM_ (setSingleChannel stri hitSampleP) ((P.map P.head . P.filter (not.P.null)) paths)
 
 
     -- callback for editing the file channel
@@ -801,14 +808,28 @@ removeAudioSamples gui = do
 
 addHitPower :: InstrumentPage -> IO ()
 addHitPower gui = do
+    addMultipleHits' gui 1
+
+
+addMultipleHits' :: InstrumentPage -> Int -> IO ()
+addMultipleHits' gui howMany = do
     instName <- entryGetText (guiEntryName gui)
-    n <- listStoreGetSize (guiInstHitViewModel gui)
-    let defSample = HitSample smplName (fromIntegral num) []
-        num = (n + 1)
-        smplName = instName `append` "-" `append` pack (show num)
-    idx <- listStoreAppend (guiInstHitViewModel gui) defSample
+    j <- listStoreGetSize (guiInstHitViewModel gui)
+    let defSample x = HitSample (smplName x) (fromIntegral x) []
+        smplName x = instName `append` "-" `append` pack (show x)
+        lst = P.map defSample [(j + 1) .. (j + howMany)]
+    idxs <- mapM (listStoreAppend (guiInstHitViewModel gui)) lst
+    let idx = P.last idxs
     treeViewSetCursor (guiInstHitView gui) [idx] Nothing
     activateRow (guiInstHitView gui) idx
+
+
+addMultipleHits :: InstrumentPage -> IO ()
+addMultipleHits gui = do
+    res <- dialogGetNrHits (guiInstNrHits gui)
+    case res of
+        Nothing -> return ()
+        Just n -> addMultipleHits' gui n
 
 
 removeHitPower :: InstrumentPage -> IO ()
