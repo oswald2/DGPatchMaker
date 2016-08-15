@@ -16,7 +16,7 @@ import Control.Exception (bracket)
 import Data.Text
 import Graphics.UI.Gtk
 import Data.IORef
-
+import System.Directory
 
 
 data FileHandlingDialog = FileHandlingDialog {
@@ -68,27 +68,31 @@ askUserForOverwriteIfNecessary diag file writeAction = do
     let dialog = guiFhDialog diag
         txt = "File '" `append` pack file `append` "' does already exist."
 
-    val <- readIORef (guiFhValue diag)
+    ex <- doesFileExist file
+    case ex of
+        True -> do
+            val <- readIORef (guiFhValue diag)
 
-    let showDialog = do
-            set dialog [messageDialogText := Just txt]
-            (ResponseUser resp) <- dialogRun dialog
-            widgetHide dialog
-            case toEnum resp of
-                Skip -> return SkipFile
+            let showDialog = do
+                    set dialog [messageDialogText := Just txt]
+                    (ResponseUser resp) <- dialogRun dialog
+                    widgetHide dialog
+                    case toEnum resp of
+                        Skip -> return SkipFile
+                        SkipAll -> return SkipFile
+                        Overwrite -> return OverwriteFile
+                        OverwriteAll -> return OverwriteFile
+
+            v <- case val of
+                Skip -> showDialog
+                Overwrite -> showDialog
                 SkipAll -> return SkipFile
-                Overwrite -> return OverwriteFile
                 OverwriteAll -> return OverwriteFile
 
-    v <- case val of
-        Skip -> showDialog
-        Overwrite -> showDialog
-        SkipAll -> return SkipFile
-        OverwriteAll -> return OverwriteFile
-
-    case v of
-        SkipFile -> return ()
-        OverwriteFile -> writeAction
+            case v of
+                SkipFile -> return ()
+                OverwriteFile -> writeAction
+        False -> writeAction
 
 
 

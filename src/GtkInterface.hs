@@ -16,6 +16,7 @@ import Gtk.MainWindow
 import Gtk.InstrumentFrame
 import Gtk.Drumkit
 import Gtk.FileHandlingDialog
+import Gtk.ErrorDialog
 
 import Gtk.DGPatchMakerBuilder
 
@@ -49,6 +50,7 @@ initMainWindow = do
     combo <- builderGetObject builder castToComboBox ("comboboxParser" :: Text)
 
     fhDialog <- initFileHandlingDialog builder
+    errDiag <- initErrorDialog builder
 
     instPages <- newIORef (V.empty)
 
@@ -68,7 +70,7 @@ initMainWindow = do
 
     void $ on buttonNewInstrument buttonActivated $ do
         let name = "NewInstrument" :: Text
-        ins <- instrumentPageNew window notebookInstruments entryBaseDirectory entrySamplesDir combo instPages fhDialog
+        ins <- instrumentPageNew window notebookInstruments entryBaseDirectory entrySamplesDir combo instPages fhDialog errDiag
         i <- notebookAppendPage notebookInstruments (instrumentPageGetMainBox ins) name
         instrumentPageInsert ins
         notebookSetCurrentPage notebookInstruments i

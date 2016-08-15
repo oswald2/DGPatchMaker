@@ -340,7 +340,7 @@ importDrumDropsDrumKit' gui = do
 
         doSingleImport progress basedir samplesDir step path = do
             ins <- instrumentPageNew (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
-                (guiBaseDir gui) (guiSamplesDir gui) (guiParserCombo gui) (guiDkInstrumentPages gui) (guiFhDialog gui)
+                (guiBaseDir gui) (guiSamplesDir gui) (guiParserCombo gui) (guiDkInstrumentPages gui) (guiFhDialog gui) (guiErrDiag gui)
             let instName = pathToInstrument samplesDir path
             _ <- notebookAppendPage (guiDkInstrumentsNotebook gui) (instrumentPageGetMainBox ins) instName
             instrumentPageInsert ins

@@ -16,7 +16,7 @@ where
 
 import Control.Monad (void, when, forM_)
 import Control.Monad.IO.Class (liftIO)
-import Control.Exception (bracket)
+import Control.Exception (bracket, catch, SomeException(..))
 
 import Prelude as P
 
@@ -47,6 +47,7 @@ import Data.DrumDrops.Utils
 import System.FilePath
 
 import Gtk.InstrumentPageBuilder
+import Gtk.ErrorDialog
 
 import Network.URI (unEscapeString)
 
@@ -80,14 +81,15 @@ data InstrumentPage = InstrumentPage {
     guiHitSamplesMenu :: Menu,
     guiSpinAttack :: SpinButton,
     guiSpinSpread :: SpinButton,
-    guiInstFhDialog :: FileHandlingDialog
+    guiInstFhDialog :: FileHandlingDialog,
+    guiInstErrDialog :: ErrorDialog
     }
 
 
 
 
-instrumentPageNew :: Window -> Notebook -> Entry -> Entry -> ComboBox -> IORef (V.Vector InstrumentPage) -> FileHandlingDialog -> IO InstrumentPage
-instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog = do
+instrumentPageNew :: Window -> Notebook -> Entry -> Entry -> ComboBox -> IORef (V.Vector InstrumentPage) -> FileHandlingDialog -> ErrorDialog -> IO InstrumentPage
+instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog errDiag = do
     -- Create the builder, and load the UI file
     builder <- builderNew
 
@@ -151,7 +153,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
         guiRendererHPName = rendererHPName,
         guiSpinAttack = spinAttack,
         guiSpinSpread = spinSpread,
-        guiInstFhDialog = fhDialog
+        guiInstFhDialog = fhDialog,
+        guiInstErrDialog = errDiag
         }
 
     -- set the default values for this instrument page
@@ -638,27 +641,38 @@ setupCallbacks instPage = do
 
     -- callback for editing the channel
     void $ on (guiRendererChan instPage) edited $ \[i] str -> do
-        val <- listStoreGetValue (guiInstSamplesViewModel instPage) i
-        let res = validateMic str
-        case res of
-            Left err -> displayErrorBox (guiMainWindow instPage) err
-            Right x -> do
-                -- set the GTK list store to the new value
-                let val' = val {afChannel = x}
-                listStoreSetValue (guiInstSamplesViewModel instPage) i val'
-                -- we also need to set the new value in the HitSample itself
+        -- do the editing for all selected audio files
+        sel1 <- treeViewGetSelection (guiInstHitView instPage)
+        hitSamplePath <- treeSelectionGetSelectedRows sel1
 
-                sel <- treeViewGetSelection (guiInstHitView instPage)
-                path <- treeSelectionGetSelectedRows sel
-                case path of
-                    ((idx:_) : _) -> do
-                        hsVal <- listStoreGetValue (guiInstHitViewModel instPage) idx
-                        let samples = hsSamples hsVal
-                            samples' = fmap upd samples
-                            upd s = if s == val then val' else s
-                            hsVal' = hsVal {hsSamples = samples'}
-                        listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
-                    _ -> return ()
+        sel <- treeViewGetSelection (guiInstSamplesView instPage)
+        paths <- treeSelectionGetSelectedRows sel
+
+        let
+            setSingleChannel :: Text -> [TreePath] -> Int -> IO ()
+            setSingleChannel str hitSamplePath i = do
+                val <- listStoreGetValue (guiInstSamplesViewModel instPage) i
+                let res = validateMic str
+                case res of
+                    Left err -> displayErrorBox (guiMainWindow instPage) err
+                    Right x -> do
+                        -- set the GTK list store to the new value
+                        let val' = val {afChannel = x}
+                        listStoreSetValue (guiInstSamplesViewModel instPage) i val'
+                        -- we also need to set the new value in the HitSample itself
+
+                        case hitSamplePath of
+                            ((idx:_) : _) -> do
+                                hsVal <- listStoreGetValue (guiInstHitViewModel instPage) idx
+                                let samples = hsSamples hsVal
+                                    samples' = fmap upd samples
+                                    upd s = if s == val then val' else s
+                                    hsVal' = hsVal {hsSamples = samples'}
+                                listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
+                            _ -> return ()
+
+        mapM_ (setSingleChannel str hitSamplePath) ((P.map P.head . P.filter (not.P.null)) paths)
+
 
     -- callback for editing the file channel
     void $ on (guiRendererFileChan instPage) edited $ \[i] str -> do
@@ -789,8 +803,9 @@ addHitPower :: InstrumentPage -> IO ()
 addHitPower gui = do
     instName <- entryGetText (guiEntryName gui)
     n <- listStoreGetSize (guiInstHitViewModel gui)
-    let defSample = HitSample smplName 1.0 []
-        smplName = instName `append` "-" `append` pack (show (n + 1))
+    let defSample = HitSample smplName (fromIntegral num) []
+        num = (n + 1)
+        smplName = instName `append` "-" `append` pack (show num)
     idx <- listStoreAppend (guiInstHitViewModel gui) defSample
     treeViewSetCursor (guiInstHitView gui) [idx] Nothing
     activateRow (guiInstHitView gui) idx
@@ -962,21 +977,38 @@ calcPower gui = do
     spread <- spinButtonGetValue (guiSpinSpread gui)
     basepath <- unpack <$> entryGetText (guiIPEntryBaseDir gui)
 
-    afs <- listStoreToList (guiInstSamplesViewModel gui)
+    dirs <- createDrumgizmoDirectories basepath
+    case dirs of
+        Left err -> displayErrorBox (guiMainWindow gui) ("Could not create Drumgizmo directory. This is necessary for getting the paths to the WAV files correctly for the file processing: "
+                        `append` err)
+        Right _ -> do
+            afs <- listStoreToList (guiInstSamplesViewModel gui)
 
-    when (not (P.null afs)) $ do
-        -- do the calculation
-        res <- mapM (calcHit basepath attack spread) afs
+            when (not (P.null afs)) $ do
+                -- do the calculation
+                res <- mapM (calcHit basepath attack spread) afs
 
-        setListStoreTo (guiInstSamplesViewModel gui) res
+                if not (P.null (lefts res))
+                    then do
+                        displayMultiErrors (guiInstErrDialog gui) "Errors during processing files:" (lefts res)
+                    else do
+                        let files = rights res
+                        setListStoreTo (guiInstSamplesViewModel gui) files
 
-        -- update the hit view
-        updateHitSample gui hsReplaceSamples res
+                        -- update the hit view
+                        updateHitSample gui hsReplaceSamples files
 
     where
-        calcHit :: FilePath -> Int -> Double -> AudioFile -> IO AudioFile
+        calcHit :: FilePath -> Int -> Double -> AudioFile -> IO (Either Text AudioFile)
         calcHit basepath attack spread x = do
+            catch (calcHit' basepath attack spread x >>= return . Right)
+                  (\e -> do
+                    let path = getInstrumentDir basepath </> afPath x
+                    return $ Left ("Error reading file: " `append` pack path `append` ": " `append` (pack (show (e :: SomeException)))))
+        calcHit' :: FilePath -> Int -> Double -> AudioFile -> IO AudioFile
+        calcHit' basepath attack spread x = do
             let path = getInstrumentDir basepath </> afPath x
+            T.putStrLn $ "Calc Hit Power path: " `append` pack path
             info <- getFileInfo path
             bracket (openFile path ReadMode info)
                     (hClose)

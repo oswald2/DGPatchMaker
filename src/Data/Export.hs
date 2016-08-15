@@ -84,7 +84,7 @@ conduitDrumKitXML dr =
     tag "drumkit" (attr "name" (dkName dr) <> attr "description" (dkDescription dr)) (channels <> instruments)
     where
         channels = tag "channels" mempty (foldr ch mempty (dkChannels dr))
-        ch x b = tag "channel" (attr "name" (pack (show x))) mempty <> b
+        ch x b = tag "channel" (attr "name" x) mempty <> b
         instruments = tag "instruments" mempty ((foldr ins mempty (dkInstruments dr)))
         ins x b = tag "instrument" (attr "name" (cmName x) <> gr x <> attr "file" (pack (cmFile x))) (channelmap x) <> b
         gr x = case cmGroup x of
