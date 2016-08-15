@@ -133,7 +133,7 @@ data HitSample = HitSample {
 
 
 data AudioFile = AudioFile {
-    afChannel:: !Microphones,
+    afChannel:: !Text,
     afPath :: !FilePath,
     afFileChannel :: !Word,
     afPower :: Maybe Double
@@ -319,7 +319,7 @@ generateDrumkit name description ifl = res
     where
         res = Drumkit name description channels chanMap
         channels' = getAvailableChannels ifl
-        channels = Prelude.map (pack.showMic) $ toAscList channels'
+        channels = toAscList channels'
 
         chanMap = Prelude.map instrumentFileToChannelMap ifl
 
@@ -332,18 +332,18 @@ instrumentFileToChannelMap ifl =
         grp (Just t) | t == HiHat = Just "hihat"
         grp _ = Nothing
         chans' = getAvailableChannelsIF ifl S.empty
-        chans = Prelude.map (\x -> (x, x)) . Prelude.map (pack . showMic) $ toAscList chans'
+        chans = Prelude.map (\x -> (x, x)) $ toAscList chans'
 
 
 
-getAvailableChannelsIF :: InstrumentFile -> Set Microphones -> Set Microphones
+getAvailableChannelsIF :: InstrumentFile -> Set Text -> Set Text
 getAvailableChannelsIF ifl set = Prelude.foldr acc1 set (ifSamples ifl)
     where
         acc1 hs s = Prelude.foldr acc s (hsSamples hs)
         acc af s1 = S.insert (afChannel af) s1
 
 
-getAvailableChannels :: [InstrumentFile] -> Set Microphones
+getAvailableChannels :: [InstrumentFile] -> Set Text
 getAvailableChannels ifl = Prelude.foldr getAvailableChannelsIF S.empty ifl
 
 

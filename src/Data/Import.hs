@@ -3,6 +3,7 @@ module Data.Import
     (
     importMidiMap
     ,importInstrumentFile
+    ,importDrumkitFile
     )
 where
 
@@ -12,7 +13,7 @@ import Data.Text.Read
 import Data.Types
 import Text.XML.Stream.Parse
 import Data.XML.Types
-import Data.Maybe
+--import Data.Maybe
 import Data.Either
 
 --import Data.Monoid ((<>))
@@ -27,6 +28,7 @@ import Data.Typeable
 data DKParseException =
     AudioFileParseError { dkpeMsg :: Text }
     | SampleFileParseError { dkpeMsg :: Text }
+    | DrumkitParseError { dkpeMsg :: Text }
     deriving (Show, Typeable)
 
 instance Exception DKParseException
@@ -87,14 +89,14 @@ parseAudioFile = do
             chan <- requireAttr "channel"
             file <- requireAttr "file"
             filechannel <- requireAttr "filechannel"
-            let chan' = (fmap fst . listToMaybe . reads) (unpack chan)
+            let
                 filechannel' = decimal filechannel
 
-            if isNothing chan' || isLeft filechannel'
-                then throwM (AudioFileParseError ("Invalid Channel or Filechannel for file: " `append` file))
+            if isLeft filechannel'
+                then throwM (AudioFileParseError ("Invalid Filechannel for file: " `append` file))
                 else do
                     let Right (x, _) = filechannel'
-                    return $ AudioFile (fromJust chan') (unpack file) x Nothing
+                    return $ AudioFile chan (unpack file) x Nothing
 
 
 importInstrumentFile :: FilePath -> IO (Either Text InstrumentFile)
@@ -110,3 +112,42 @@ importInstrumentFile path = do
             let msg = (pack xmlErrorMessage) `append` "\n\nContext: " `append` (pack (show xmlBadInput))
             return (Left msg)
         handler2 e = return (Left (pack (show e)))
+
+
+
+
+
+
+conduitDrumKitXML :: MonadThrow m => ConduitM Event o m (Maybe Drumkit)
+conduitDrumKitXML = do
+    tagName "drumkit" ((,) <$> requireAttr "name" <*> requireAttr "description" ) $ \(name, description) -> do
+        chans <- channels
+        insts <- instruments
+        case (chans, insts) of
+            (Just c, Just i) -> return $ Drumkit name description c i
+            _ -> throwM (DrumkitParseError "Cannot parse drumkit")
+    where
+        channels = tagNoAttr "channels" (many ch)
+        ch = tagName "channel" (requireAttr "name" ) return
+        instruments = tagNoAttr "instruments" (many ins)
+        ins = tagName "instrument" ((,,) <$> requireAttr "name" <*> attr "group" <*> requireAttr "file" ) $ \(name, group, file) -> do
+            cm <- many channelmap
+            return $ ChannelMap name group (unpack file) Nothing cm (cmCheckUndefined cm)
+        channelmap = tagName "channelmap" ((,) <$> requireAttr "in" <*> requireAttr "out") return
+
+
+
+importDrumkitFile :: FilePath -> IO (Either Text Drumkit)
+importDrumkitFile path = do
+    catches worker [Handler handler, Handler handler2]
+    where
+        worker = do
+            iF <- runResourceT $
+                parseFile def path $$ conduitDrumKitXML
+            return (maybe (Left "Could not parse file") Right iF)
+        handler e = return (Left (dkpeMsg e))
+        handler2 XmlException{..} = do
+            let msg = (pack xmlErrorMessage) `append` "\n\nContext: " `append` (pack (show xmlBadInput))
+            return (Left msg)
+        handler2 e = return (Left (pack (show e)))
+

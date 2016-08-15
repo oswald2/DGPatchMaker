@@ -11,6 +11,7 @@ module Gtk.InstrumentFrame
     ,instrumentPageSetInstrumentName
     ,instrumentPageGetInstrumentName
     ,instrumentPageGetInstrumentFile
+    ,instrumentPageLoadFile
     )
 where
 
@@ -308,7 +309,7 @@ getAudioSampleFromFile basepath file = do
 
     let relName x = determinePath basepath (dropFileName x) (pack (takeFileName x))
 
-    return $ P.map (\x -> AudioFile Undefined (relName file) (fromIntegral x) Nothing) idx
+    return $ P.map (\x -> AudioFile (pack (showMic Undefined)) (relName file) (fromIntegral x) Nothing) idx
 
 
 
@@ -472,7 +473,7 @@ initTreeViewSamples tv ls = do
                     ]
 
 
-    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := pack (showMic (afChannel hs)), cellComboTextModel := (lsChans, colId)]
+    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := afChannel hs, cellComboTextModel := (lsChans, colId)]
     cellLayoutSetAttributes col2 renderer2 ls $ \hs -> [ cellText := afPath hs ]
     cellLayoutSetAttributes col3 renderer3 ls $ \hs -> [ cellText := pack (show (afFileChannel hs)) ]
     cellLayoutSetAttributes col4 renderer4 ls $ \hs -> [ cellText := showPower hs ]
@@ -662,9 +663,9 @@ setupCallbacks instPage = do
                 let res = validateMic str
                 case res of
                     Left err -> displayErrorBox (guiMainWindow instPage) err
-                    Right x -> do
+                    Right _ -> do
                         -- set the GTK list store to the new value
-                        let val' = val {afChannel = x}
+                        let val' = val {afChannel = str}
                         listStoreSetValue (guiInstSamplesViewModel instPage) i val'
                         -- we also need to set the new value in the HitSample itself
 
@@ -856,7 +857,7 @@ getInstrumentFromGUI instPage = do
         t' = validate "Type" t
 
     case t' of
-        Left err  -> do
+        Left _  -> do
             let res = InstrumentFile version name Nothing samples
             return (Right res)
         Right typ -> do
@@ -1055,12 +1056,17 @@ loadInstrument gui = do
     f <- getXMLFile gui
     case f of
         Nothing -> return ()
-        Just fname -> do
-            ifr <- importInstrumentFile fname
-            case ifr of
-                Left err -> displayErrorBox (guiMainWindow gui) $ "Could not load the file:" `append` (pack fname) `append` ":\n" `append` err
-                Right iF -> do
-                    instrumentPageSetInstrumentFile gui iF
+        Just fname -> instrumentPageLoadFile gui fname
+
+
+
+instrumentPageLoadFile :: InstrumentPage -> FilePath -> IO ()
+instrumentPageLoadFile gui fname = do
+    ifr <- importInstrumentFile fname
+    case ifr of
+        Left err -> displayErrorBox (guiMainWindow gui) $ "Could not load the file:" `append` (pack fname) `append` ":\n" `append` err
+        Right iF -> do
+            instrumentPageSetInstrumentFile gui iF
 
 
 

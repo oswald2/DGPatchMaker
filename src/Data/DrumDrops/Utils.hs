@@ -115,8 +115,8 @@ getSampleFromFileName ModernFolkParser = MFP.getSampleFromFileName
 
 
 
-determineChannel :: ParserType -> Sample -> Channel -> Microphones
-determineChannel parserType sample channel =
+determineChannel :: ParserType -> Sample -> Channel -> Text
+determineChannel parserType sample channel = pack . showMic $
     case parserType of
         MapexParser -> MP.determineChannel sample channel
         VintageFolkParser -> VFP.determineChannel sample channel

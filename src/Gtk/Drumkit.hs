@@ -16,7 +16,7 @@ import Data.DrumDrops.Utils
 import Data.Char (isSpace)
 import Data.Export
 import Data.Drumgizmo
---import Data.Import
+import Data.Import
 import Data.Either
 
 
@@ -83,6 +83,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     buttonExportDrumkit <- builderGetObject builder castToButton ("buttonExportDrumkit" :: Text)
     buttonSetBaseDir <- builderGetObject builder castToButton ("buttonSetBaseDir" :: Text)
     buttonSetSamplesDir <- builderGetObject builder castToButton ("buttonSetSamplesDir" :: Text)
+    buttonLoadDrumkit <- builderGetObject builder castToButton ("buttonLoadDrumkit" :: Text)
 
     tvChannels <- builderGetObject builder castToTreeView ("treeviewChannels" :: Text)
     tvInstruments <- builderGetObject builder castToTreeView ("treeviewInstruments" :: Text)
@@ -167,6 +168,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     void $ G.on buttonImportDrumkit buttonActivated $ importDrumDropsDrumKit gui
     void $ G.on buttonExportDrumkit buttonActivated $ exportDrumKit gui
+    void $ G.on buttonLoadDrumkit buttonActivated $ loadDrumkit gui
 
     void $ G.on resetButton buttonActivated $ resetDrumkit gui
     void $ G.on compileButton buttonActivated $ compileDrumkit gui
@@ -785,4 +787,74 @@ addUndefinedIfNeeded gui = do
             Just _ -> return ()
 
 
+
+loadDrumkit :: DrumkitPage -> IO ()
+loadDrumkit gui = do
+    let parentWindow = guiDkParentWindow gui
+    dialog <- fileChooserDialogNew
+              (Just $ ("Load a Drumkit" :: Text))             --dialog title
+              (Just parentWindow)                     --the parent window
+              FileChooserActionOpen                         --the kind of dialog we want
+              [("gtk-cancel"                                --The buttons to display
+               ,ResponseCancel)
+              ,("gtk-open"
+               , ResponseAccept)]
+
+    widgetShow dialog
+    resp <- dialogRun dialog
+    case resp of
+        ResponseAccept -> do
+            f <- fileChooserGetFilename dialog
+            case f of
+                Nothing -> return ()
+                Just file -> do
+                    loadDrumkit' gui file
+                    return ()
+        _ -> return ()
+    widgetHide dialog
+
+
+loadDrumkit' :: DrumkitPage -> FilePath -> IO ()
+loadDrumkit' gui file = do
+    res <- importDrumkitFile file
+    case res of
+        Left err -> displayErrorBox (guiDkParentWindow gui) ("Error on loading drumkit: " <> err)
+        Right dk -> do
+            resetDrumkit gui
+
+            let basepath = getBasePath file
+                basepathT :: Text
+                basepathT = pack basepath
+            entrySetText (guiBaseDir gui) basepathT
+
+            -- set the actual drumkit
+            writeIORef (guiDrumkit gui) (Just dk)
+
+            -- set the channels for viewing
+            setChannels gui (dkChannels dk)
+            setInstruments gui (dkInstruments dk)
+
+            -- now load the instrument files
+            loadInstrumentFiles gui (takeDirectory file) (dkInstruments dk)
+            return ()
+
+
+loadInstrumentFiles :: DrumkitPage -> FilePath -> [ChannelMap] -> IO ()
+loadInstrumentFiles gui path files = do
+    mapM_ loadFile files
+    where
+        loadFile cm = do
+            let name = cmName cm
+            ins <- instrumentPageNew (guiDkParentWindow gui)
+                    (guiDkInstrumentsNotebook gui)
+                    (guiBaseDir gui)
+                    (guiSamplesDir gui)
+                    (guiParserCombo gui)
+                    (guiDkInstrumentPages gui)
+                    (guiFhDialog gui)
+                    (guiErrDiag gui)
+            void $ notebookAppendPage (guiDkInstrumentsNotebook gui) (instrumentPageGetMainBox ins) name
+            instrumentPageInsert ins
+            instrumentPageSetInstrumentName ins name
+            instrumentPageLoadFile ins (path </> (cmFile cm))
 
