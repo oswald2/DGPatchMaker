@@ -22,7 +22,7 @@ import Data.Either
 
 import qualified Data.Vector as V
 
---import qualified Data.Text as T
+import Data.Text as T (last)
 --import Data.IORef
 import qualified Data.Set as S
 
@@ -80,10 +80,15 @@ initDrumkitPage :: Window ->
 initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir ioref fhDialog = do
 
     buttonImportDrumkit <- builderGetObject builder castToButton ("buttonImportDrumkit" :: Text)
-    buttonExportDrumkit <- builderGetObject builder castToButton ("buttonExportDrumkit" :: Text)
+    -- buttonExportDrumkit <- builderGetObject builder castToButton ("buttonExportDrumkit" :: Text)
     buttonSetBaseDir <- builderGetObject builder castToButton ("buttonSetBaseDir" :: Text)
     buttonSetSamplesDir <- builderGetObject builder castToButton ("buttonSetSamplesDir" :: Text)
-    buttonLoadDrumkit <- builderGetObject builder castToButton ("buttonLoadDrumkit" :: Text)
+    buttonConvertToFullMix <- builderGetObject builder castToButton ("buttonConvertToFullMix" :: Text)
+
+    miLoadDrumKit <- builderGetObject builder castToMenuItem ("imagemenuitemLoadDrumkit" :: Text)
+    miExportDrumKit <- builderGetObject builder castToMenuItem ("menuitemExportDrumkit" :: Text)
+    miSaveDrumkitFile <- builderGetObject builder castToMenuItem ("imagemenuitemSaveDrumkitFile" :: Text)
+
 
     tvChannels <- builderGetObject builder castToTreeView ("treeviewChannels" :: Text)
     tvInstruments <- builderGetObject builder castToTreeView ("treeviewInstruments" :: Text)
@@ -167,8 +172,14 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     void $ G.on buttonSetSamplesDir buttonActivated $ setSamplesDir gui
 
     void $ G.on buttonImportDrumkit buttonActivated $ importDrumDropsDrumKit gui
-    void $ G.on buttonExportDrumkit buttonActivated $ exportDrumKit gui
-    void $ G.on buttonLoadDrumkit buttonActivated $ loadDrumkit gui
+    --void $ G.on buttonExportDrumkit buttonActivated $ exportDrumKit gui
+    --void $ G.on buttonLoadDrumkit buttonActivated $ loadDrumkit gui
+
+    void $ G.on buttonConvertToFullMix buttonActivated $ convertToFullMix gui
+
+    void $ G.on miLoadDrumKit menuItemActivated $ loadDrumkit gui
+    void $ G.on miExportDrumKit menuItemActivated $ exportDrumKit gui
+    void $ G.on miSaveDrumkitFile menuItemActivated $ saveDrumkit gui
 
     void $ G.on resetButton buttonActivated $ resetDrumkit gui
     void $ G.on compileButton buttonActivated $ compileDrumkit gui
@@ -675,6 +686,52 @@ writeDrumKitFile' gui nm basepath = do
 
 
 
+saveDrumkit :: DrumkitPage -> IO ()
+saveDrumkit gui = do
+    basepath <- entryGetText (guiBaseDir gui)
+    nm <- unpack <$> getDkName gui
+
+    let parentWindow = guiDkParentWindow gui
+
+    dialog <- fileChooserDialogNew
+                (Just $ ("Save Drumkit File" :: Text))             --dialog title
+                (Just parentWindow)                     --the parent window
+                FileChooserActionSave                         --the kind of dialog we want
+                [("gtk-cancel"                                --The buttons to display
+                 ,ResponseCancel)
+                 ,("gtk-save"
+                 , ResponseAccept)]
+
+    void $ fileChooserSetCurrentFolder dialog (getDrumgizmoDir basepath)
+    void $ fileChooserSetCurrentName dialog nm
+
+
+    widgetShow dialog
+    resp <- dialogRun dialog
+    case resp of
+        ResponseAccept -> do
+            nam <- fileChooserGetFilename dialog
+            bp <- fileChooserGetCurrentFolder dialog
+
+            case (nam, bp) of
+                (Just name, Just dir) -> do
+                    withFileHandlingDialog (guiFhDialog gui) $ do
+                        drumkit <- readIORef (guiDrumkit gui)
+                        case drumkit of
+                            Nothing -> return ()
+                            Just d -> do
+                                channels <- listStoreToList (guiTvChannelsModel gui)
+                                insts <- listStoreToList (guiTvInstrumentsModel gui)
+                                desc <- getDkDescription gui
+                                let d' = d {dkName = (pack nm), dkDescription = desc, dkChannels = channels, dkInstruments = insts}
+                                    drumkitFName' = dir </> name
+                                    drumkitFName = if takeExtension drumkitFName' == ".xml" then drumkitFName' else addExtension drumkitFName' ".xml"
+                                writeIORef (guiDrumkit gui) (Just d')
+
+                                askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
+                _ -> return ()
+        _ -> return ()
+    widgetHide dialog
 
 
 
@@ -857,4 +914,27 @@ loadInstrumentFiles gui path files = do
             instrumentPageInsert ins
             instrumentPageSetInstrumentName ins name
             instrumentPageLoadFile ins (path </> (cmFile cm))
+
+
+
+convertToFullMix :: DrumkitPage -> IO ()
+convertToFullMix gui = do
+    -- got through all instruments an change the channel mapping to Full Mix
+    mapInsts gui convert
+
+    -- remove all channels and add the FullMix channels
+    setListStoreTo (guiTvChannelsModel gui) (map (pack.showMic) [FullMixL, FullMixR])
+
+    listStoreClear (guiTvChannelMapModel gui)
+
+    return ()
+    where
+        convert :: ChannelMap -> ChannelMap
+        convert x = x { cmMap = func (cmMap x) }
+        func :: [(Text, Text)] -> [(Text, Text)]
+        func [] = []
+        func ((inc, outc) : xs) | (T.last outc == 'L') = (inc, pack (showMic FullMixL)) : func xs
+                                | (T.last outc == 'R') = (inc, pack (showMic FullMixR)) : func xs
+                                | otherwise = (inc, pack (showMic FullMixL)) : (inc, pack (showMic FullMixR)) : func xs
+
 

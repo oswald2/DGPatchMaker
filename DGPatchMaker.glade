@@ -29,17 +29,16 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem1">
-                        <property name="label">gtk-new</property>
+                      <object class="GtkMenuItem" id="imagemenuitemLoadDrumkit">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Load Drumkit</property>
                         <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
                       </object>
                     </child>
                     <child>
-                      <object class="GtkImageMenuItem" id="menuitemImportMV">
-                        <property name="label" translatable="yes">Import DrumDrops Multi Velocity</property>
+                      <object class="GtkImageMenuItem" id="menuitemExportDrumkit">
+                        <property name="label" translatable="yes">Export Drumkit</property>
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="image">image1</property>
@@ -47,21 +46,11 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem3">
-                        <property name="label">gtk-save</property>
+                      <object class="GtkMenuItem" id="imagemenuitemSaveDrumkitFile">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Save Drumkit File only</property>
                         <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem4">
-                        <property name="label">gtk-save-as</property>
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
                       </object>
                     </child>
                     <child>
@@ -142,8 +131,8 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkButton" id="buttonLoadDrumkit">
-                        <property name="label" translatable="yes">Load Drumkit</property>
+                      <object class="GtkButton" id="buttonConvertToFullMix">
+                        <property name="label" translatable="yes">Convert To Full Mix</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="receives_default">True</property>
