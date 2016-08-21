@@ -836,12 +836,16 @@ addMultipleHits gui = do
 removeHitPower :: InstrumentPage -> IO ()
 removeHitPower gui = do
     sel1 <- treeViewGetSelection (guiInstHitView gui)
-    selHit <- P.head . P.head <$> treeSelectionGetSelectedRows sel1
-    listStoreRemove (guiInstHitViewModel gui) selHit
+    selHit <- treeSelectionGetSelectedRows sel1
+    case selHit of
+        ((x:_):_) -> listStoreRemove (guiInstHitViewModel gui) x
+        _ -> return ()
 
     -- activate the row so that the audio sample view is refreshed
-    selHitAct <- P.head . P.head <$> treeSelectionGetSelectedRows sel1
-    activateRow (guiInstHitView gui) selHitAct
+    selHitAct <- treeSelectionGetSelectedRows sel1
+    case selHitAct of
+        ((x:_):_) -> activateRow (guiInstHitView gui) x
+        _ -> return ()
 
 
 
