@@ -13,7 +13,7 @@ import System.FilePath
 
 import Data.Types
 import Data.DrumDrops.Utils
-import Data.Char (isSpace)
+import Data.Char (isSpace, isDigit)
 import Data.Export
 import Data.Drumgizmo
 import Data.Import
@@ -22,7 +22,7 @@ import Data.Either
 
 import qualified Data.Vector as V
 
-import Data.Text as T (last)
+import Data.Text as T (last, dropEnd)
 --import Data.IORef
 import qualified Data.Set as S
 
@@ -63,7 +63,8 @@ data DrumkitPage = DrumkitPage {
     guiChannelRenderer :: CellRendererText,
     guiFhDialog :: FileHandlingDialog,
     guiOutChannelRenderer :: CellRendererCombo,
-    guiGroupRenderer :: CellRendererText
+    guiGroupRenderer :: CellRendererText,
+    guiChannelMapMenu :: Menu
 }
 
 
@@ -135,6 +136,10 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     itemAddChannel <- builderGetObject builder castToMenuItem ("menuitemAddChannel" :: Text)
     itemRemoveChannel <- builderGetObject builder castToMenuItem ("menuitemRemoveChannel" :: Text)
 
+    channelMapMenu <- builderGetObject builder castToMenu ("menuChannelMap" :: Text)
+    itemDuplicate <- builderGetObject builder castToMenuItem ("menuitemDuplicate" :: Text)
+    itemRemoveCM <- builderGetObject builder castToMenuItem ("menuitemRemove" :: Text)
+
 
     let gui = DrumkitPage{
             guiDkParentWindow = mainWindow,
@@ -163,7 +168,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
             guiChannelRenderer = channelRenderer,
             guiFhDialog = fhDialog,
             guiOutChannelRenderer = outRenderer,
-            guiGroupRenderer = groupRenderer
+            guiGroupRenderer = groupRenderer,
+            guiChannelMapMenu = channelMapMenu
         }
 
     setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
@@ -186,6 +192,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     void $ G.on itemAddChannel menuItemActivated $ addChannel gui
     void $ G.on itemRemoveChannel menuItemActivated $ removeChannel gui
+
+    void $ G.on itemDuplicate menuItemActivated $ duplicateCM gui
+    void $ G.on itemRemoveCM menuItemActivated $ removeCM gui
 
     setupCallbacks gui
 
@@ -595,7 +604,7 @@ setupCallbacks gui = do
 
     -- callback for editing the channel
     void $ G.on (guiOutChannelRenderer gui) edited $ \[i] str -> do
-        val@(inc, _) <- listStoreGetValue (guiTvChannelMapModel gui) i
+        (inc, _) <- listStoreGetValue (guiTvChannelMapModel gui) i
         -- set the GTK list store to the new value
         let val' = (inc, str)
         listStoreSetValue (guiTvChannelMapModel gui) i val'
@@ -607,8 +616,8 @@ setupCallbacks gui = do
             ((idx:_) : _) -> do
                 hsVal <- listStoreGetValue (guiTvInstrumentsModel gui) idx
                 let cm = cmMap hsVal
-                    cm' = fmap upd cm
-                    upd s = if s == val then val' else s
+                    cm' = zipWith upd cm [0..]
+                    upd s j = if j == i then val' else s
                     hsVal' = hsVal {cmMap = cm'}
                 listStoreSetValue (guiTvInstrumentsModel gui) idx hsVal'
             _ -> return ()
@@ -619,6 +628,15 @@ setupCallbacks gui = do
         -- set the GTK list store to the new value
         let newVal = if str == "" || str == "--" then oldVal {cmGroup = Nothing} else oldVal {cmGroup = Just str}
         listStoreSetValue (guiTvInstrumentsModel gui) i newVal
+
+    -- right click on the channel view shows the popup for add/remove
+    void $ G.on (guiTvChannelMap gui) buttonPressEvent $ do
+        bt <- eventButton
+        case bt of
+            RightButton -> do
+                liftIO $ menuPopup (guiChannelMapMenu gui) Nothing
+                return True
+            _ -> return False
 
 
 mapInsts :: DrumkitPage -> (ChannelMap -> ChannelMap) -> IO ()
@@ -933,8 +951,49 @@ convertToFullMix gui = do
         convert x = x { cmMap = func (cmMap x) }
         func :: [(Text, Text)] -> [(Text, Text)]
         func [] = []
-        func ((inc, outc) : xs) | (T.last outc == 'L') = (inc, pack (showMic FullMixL)) : func xs
-                                | (T.last outc == 'R') = (inc, pack (showMic FullMixR)) : func xs
+        func ((inc, outc) : xs) | isLeftChannel outc = (inc, pack (showMic FullMixL)) : func xs
+                                | isRightChannel outc = (inc, pack (showMic FullMixR)) : func xs
                                 | otherwise = (inc, pack (showMic FullMixL)) : (inc, pack (showMic FullMixR)) : func xs
 
+isLeftChannel :: Text -> Bool
+isLeftChannel x | T.last x == 'L' = True
+         | isDigit (T.last x) && (T.last (T.dropEnd 1 x)) == 'L' = True
+         | otherwise = False
 
+isRightChannel :: Text -> Bool
+isRightChannel x | T.last x == 'R' = True
+         | isDigit (T.last x) && (T.last (T.dropEnd 1 x)) == 'R' = True
+         | otherwise = False
+
+
+
+duplicateCM :: DrumkitPage -> IO ()
+duplicateCM gui = do
+    -- get seledted cm and duplicate it
+    sel <- treeViewGetSelection (guiTvChannelMap gui)
+    s <- treeSelectionGetSelectedRows sel
+    case s of
+        ((x:_):_) -> do
+            val <- listStoreGetValue (guiTvChannelMapModel gui) x
+            listStoreInsert (guiTvChannelMapModel gui) (x + 1) val
+
+            sel1 <- treeViewGetSelection (guiTvInstruments gui)
+            s1 <- treeSelectionGetSelectedRows sel1
+            case s1 of
+                ((i:_):_) -> do
+                    cm <- listStoreGetValue (guiTvInstrumentsModel gui) i
+                    vals <- listStoreToList (guiTvChannelMapModel gui)
+                    listStoreSetValue (guiTvInstrumentsModel gui) i (cm {cmMap = vals})
+                _ -> return ()
+
+        _ -> return ()
+
+
+removeCM :: DrumkitPage -> IO ()
+removeCM gui = do
+    sel <- treeViewGetSelection (guiTvChannelMap gui)
+    s <- treeSelectionGetSelectedRows sel
+    case s of
+        ((x:_):_) -> do
+            listStoreRemove (guiTvChannelMapModel gui) x
+        _ -> return ()

@@ -959,6 +959,26 @@
       </object>
     </child>
   </object>
+  <object class="GtkMenu" id="menuChannelMap">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <child>
+      <object class="GtkMenuItem" id="menuitemDuplicate">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="label" translatable="yes">Duplicate</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="menuitemRemove">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="label" translatable="yes">Remove</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+  </object>
   <object class="GtkMenu" id="menuChannels">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
