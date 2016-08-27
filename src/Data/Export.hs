@@ -55,7 +55,7 @@ conduitAudioFiles:: Monad m => [AudioFile] -> C.Source m Event
 conduitAudioFiles afs =
     foldr f mempty afs
     where
-        f x b = tag "audiofile" (attr "channel" (pack (show (afChannel x)))
+        f x b = tag "audiofile" (attr "channel" (afChannel x)
                                 <> attr "file" (pack (afPath x))
                                 <> attr "filechannel" ((pack.show.afFileChannel) x)) mempty <> b
 
