@@ -64,7 +64,9 @@ data DrumkitPage = DrumkitPage {
     guiFhDialog :: FileHandlingDialog,
     guiOutChannelRenderer :: CellRendererCombo,
     guiGroupRenderer :: CellRendererText,
-    guiChannelMapMenu :: Menu
+    guiChannelMapMenu :: Menu,
+    guiBtCompileGM :: Button,
+    guiBtCompileDef :: Button
 }
 
 
@@ -140,6 +142,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     itemDuplicate <- builderGetObject builder castToMenuItem ("menuitemDuplicate" :: Text)
     itemRemoveCM <- builderGetObject builder castToMenuItem ("menuitemRemove" :: Text)
 
+    btCompileGM <- builderGetObject builder castToButton ("buttonCompileFromKitGM" :: Text)
+    btCompileDef <- builderGetObject builder castToButton ("buttonCompileFromKitDefault" :: Text)
+
 
     let gui = DrumkitPage{
             guiDkParentWindow = mainWindow,
@@ -169,7 +174,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
             guiFhDialog = fhDialog,
             guiOutChannelRenderer = outRenderer,
             guiGroupRenderer = groupRenderer,
-            guiChannelMapMenu = channelMapMenu
+            guiChannelMapMenu = channelMapMenu,
+            guiBtCompileGM = btCompileGM,
+            guiBtCompileDef = btCompileDef
         }
 
     setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
@@ -195,6 +202,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     void $ G.on itemDuplicate menuItemActivated $ duplicateCM gui
     void $ G.on itemRemoveCM menuItemActivated $ removeCM gui
+
+    void $ G.on btCompileGM buttonActivated $ compileMidiMapGM gui
+    void $ G.on btCompileDef buttonActivated $ compileMidiMapDefault gui
 
     setupCallbacks gui
 
@@ -290,6 +300,23 @@ setSamplesDir mainWindow = do
 
 
 
+setDrumkit :: DrumkitPage -> Drumkit -> IO ()
+setDrumkit gui dk = do
+    writeIORef (guiDrumkit gui) (Just dk)
+    widgetSetSensitive (guiBtCompileGM gui) True
+    widgetSetSensitive (guiBtCompileDef gui) True
+
+
+clearDrumkit :: DrumkitPage -> IO ()
+clearDrumkit gui = do
+    writeIORef (guiDrumkit gui) Nothing
+    widgetSetSensitive (guiBtCompileGM gui) False
+    widgetSetSensitive (guiBtCompileDef gui) False
+
+
+getDrumkit :: DrumkitPage -> IO (Maybe Drumkit)
+getDrumkit gui = do
+    readIORef (guiDrumkit gui)
 
 
 importDrumDropsDrumKit :: DrumkitPage -> IO ()
@@ -329,7 +356,7 @@ importDrumDropsDrumKit' gui = do
                     let drumkit = generateDrumkit nm desc insts
 
                     -- set the actual drumkit
-                    writeIORef (guiDrumkit gui) (Just drumkit)
+                    setDrumkit gui drumkit
 
                     -- set the channels for viewing
                     setChannels gui (dkChannels drumkit)
@@ -660,11 +687,11 @@ exportDrumKit gui = do
                 False -> withFileHandlingDialog (guiFhDialog gui) $ do
                             writeDrumKitFile gui nm basepath
                             -- get the midi map and write it
-                            gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
-                            defMidi <- getMidiMapFromGUI (guiMidiMapDef gui)
+                            --gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
+                            --defMidi <- getMidiMapFromGUI (guiMidiMapDef gui)
 
-                            writeMidiMapFile (guiMidiMapGM gui) "MIDIMap_GM.xml" gmMidi
-                            writeMidiMapFile (guiMidiMapDef gui) "MIDIMap_Default.xml" defMidi
+                            --writeMidiMapFile (guiMidiMapGM gui) "MIDIMap_GM.xml" gmMidi
+                            --writeMidiMapFile (guiMidiMapDef gui) "MIDIMap_Default.xml" defMidi
 
 
 
@@ -683,7 +710,7 @@ writeDrumKitFile' gui nm basepath = do
             desc <- getDkDescription gui
 
             -- read the drumkit from the IORef
-            drumkit <- readIORef (guiDrumkit gui)
+            drumkit <- getDrumkit gui
 
             case drumkit of
                 Nothing -> return ()
@@ -695,7 +722,7 @@ writeDrumKitFile' gui nm basepath = do
                         dgPath = getDrumgizmoDir basedir
                         drumkitFName = dgPath </> unpack nm <.> ".xml"
 
-                    writeIORef (guiDrumkit gui) (Just d')
+                    setDrumkit gui d'
 
                     askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
 
@@ -734,7 +761,7 @@ saveDrumkit gui = do
             case (nam, bp) of
                 (Just name, Just dir) -> do
                     withFileHandlingDialog (guiFhDialog gui) $ do
-                        drumkit <- readIORef (guiDrumkit gui)
+                        drumkit <- getDrumkit gui
                         case drumkit of
                             Nothing -> return ()
                             Just d -> do
@@ -744,7 +771,7 @@ saveDrumkit gui = do
                                 let d' = d {dkName = (pack nm), dkDescription = desc, dkChannels = channels, dkInstruments = insts}
                                     drumkitFName' = dir </> name
                                     drumkitFName = if takeExtension drumkitFName' == ".xml" then drumkitFName' else addExtension drumkitFName' ".xml"
-                                writeIORef (guiDrumkit gui) (Just d')
+                                setDrumkit gui d'
 
                                 askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
                 _ -> return ()
@@ -774,7 +801,7 @@ resetDrumkit gui = do
     listStoreClear (guiTvInstrumentsModel gui)
     listStoreClear (guiTvChannelMapModel gui)
 
-    writeIORef (guiDrumkit gui) Nothing
+    clearDrumkit gui
 
     v <- readIORef (guiDkInstrumentPages gui)
     V.mapM_ instrumentPageReset v
@@ -805,7 +832,7 @@ compileDrumkit gui = do
                 insts = rights (V.toList instF)
 
             -- set the actual drumkit
-            writeIORef (guiDrumkit gui) (Just drumkit)
+            setDrumkit gui drumkit
 
             -- set the channels for viewing
             setChannels gui (dkChannels drumkit)
@@ -901,9 +928,13 @@ loadDrumkit' gui file = do
                 basepathT :: Text
                 basepathT = pack basepath
             entrySetText (guiBaseDir gui) basepathT
+            entrySetText (guiSamplesDir gui) basepathT
+
+            entrySetText (guiDkName gui) (dkName dk)
+            setDkDescription gui (dkDescription dk)
 
             -- set the actual drumkit
-            writeIORef (guiDrumkit gui) (Just dk)
+            setDrumkit gui dk
 
             -- set the channels for viewing
             setChannels gui (dkChannels dk)
@@ -996,4 +1027,37 @@ removeCM gui = do
     case s of
         ((x:_):_) -> do
             listStoreRemove (guiTvChannelMapModel gui) x
+
+            sel1 <- treeViewGetSelection (guiTvInstruments gui)
+            s1 <- treeSelectionGetSelectedRows sel1
+            case s1 of
+                ((i:_):_) -> do
+                    cm <- listStoreGetValue (guiTvInstrumentsModel gui) i
+                    vals <- listStoreToList (guiTvChannelMapModel gui)
+                    listStoreSetValue (guiTvInstrumentsModel gui) i (cm {cmMap = vals})
+                _ -> return ()
         _ -> return ()
+
+
+compileMidiMapGM :: DrumkitPage -> IO ()
+compileMidiMapGM gui = do
+    -- also convert the drumkit to a midi map
+    dr <- getDrumkit gui
+    case dr of
+        Nothing -> return ()
+        Just drumkit -> do
+            let midimap = getMidiMap drumkit
+            setMidiMap (guiMidiMapGM gui) midimap
+
+
+compileMidiMapDefault :: DrumkitPage -> IO ()
+compileMidiMapDefault gui = do
+    -- also convert the drumkit to a midi map
+    dr <- getDrumkit gui
+    case dr of
+        Nothing -> return ()
+        Just drumkit -> do
+            let midimap = getMidiMap drumkit
+            setMidiMap (guiMidiMapDef gui) midimap
+
+
