@@ -147,6 +147,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     btUp <- builderGetObject builder castToButton ("buttonUp" :: Text)
     btDown <- builderGetObject builder castToButton ("buttonDown" :: Text)
+    btSort <- builderGetObject builder castToButton ("buttonSort" :: Text)
 
 
     let gui = DrumkitPage{
@@ -211,6 +212,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     void $ G.on btUp buttonActivated $ channelUp gui
     void $ G.on btDown buttonActivated $ channelDown gui
+    void $ G.on btSort buttonActivated $ sortChannels gui
 
     setupCallbacks gui
 
@@ -1075,8 +1077,10 @@ channelUp gui = do
         ((i:_):_) -> do
             let ls = guiTvChannelsModel gui
             ch <- listStoreGetValue ls i
-            listStoreInsert ls (i - 1) ch
             listStoreRemove ls i
+            let idx = if i > 0 then (i - 1) else 0
+            listStoreInsert ls idx ch
+            activateRow (guiTvChannels gui) idx
         _ -> return ()
 
 
@@ -1088,6 +1092,36 @@ channelDown gui = do
         ((i:_):_) -> do
             let ls = guiTvChannelsModel gui
             ch <- listStoreGetValue ls i
-            listStoreInsert ls (i + 1) ch
             listStoreRemove ls i
+            let idx = (i + 1)
+            listStoreInsert ls idx ch
+            activateRow (guiTvChannels gui) idx
         _ -> return ()
+
+
+
+sortChannels :: DrumkitPage -> IO ()
+sortChannels gui = do
+    chans <- listStoreToList (guiTvChannelsModel gui)
+    let newChans = map snd . sortOn fst . map chanToOrd $ chans
+    setListStoreTo (guiTvChannelsModel gui) newChans
+    return ()
+
+
+chanToOrd :: Text -> (Int, Text)
+chanToOrd x =
+    let !xx = toLower x
+        worker
+            | "kick" `isInfixOf` xx = (0, x)
+            | "snare" `isInfixOf` xx = (1, x)
+            | "hihat" `isInfixOf` xx = (2, x)
+            | "tom" `isInfixOf` xx = (3, x)
+            | "floor" `isInfixOf` xx = (4, x)
+            | "ride" `isInfixOf` xx = (5, x)
+            | "ohl" == xx = (6, x)
+            | "ohr" == xx = (6, x)
+            | "room" `isInfixOf` xx = (7, x)
+            | "fullmix" `isInfixOf` xx = (8, x)
+            | otherwise = (100, x)
+    in
+        worker

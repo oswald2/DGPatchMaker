@@ -543,6 +543,14 @@
         <property name="use_underline">True</property>
       </object>
     </child>
+    <child>
+      <object class="GtkMenuItem" id="menuitemToNewHS">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="label" translatable="yes">Add To New Hit Sample...</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
   </object>
   <object class="GtkMenu" id="menuHits">
     <property name="visible">True</property>

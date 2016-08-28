@@ -116,6 +116,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     menuAddSamples <- builderGetObject builder castToMenuItem ("menuitemAdd" :: Text)
     menuRemoveSample <- builderGetObject builder castToMenuItem ("menuitemRemove" :: Text)
     menuSelectFC <- builderGetObject builder castToMenuItem ("menuitemSelectFC" :: Text)
+    menuAddNewHS <- builderGetObject builder castToMenuItem ("menuitemToNewHS" :: Text)
 
     hitPopUp <- builderGetObject builder castToMenu ("menuHits" :: Text)
     menuAddHitSample <- builderGetObject builder castToMenuItem ("menuitemAddHitSample" :: Text)
@@ -185,6 +186,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     void $ on menuAddSamples menuItemActivate (addSamples gui)
     void $ on menuRemoveSample menuItemActivate (removeAudioSamples gui)
     void $ on menuSelectFC menuItemActivate (selectAllFC gui)
+    void $ on menuAddNewHS menuItemActivate (toNewHitSample gui)
 
     void $ on menuAddHitSample menuItemActivate (addHitPower gui)
     void $ on menuRemoveHitSample menuItemActivate (removeHitPower gui)
@@ -759,9 +761,11 @@ updateHitSample gui f af = do
     -- also update the hit sample
     sel <- treeViewGetSelection (guiInstHitView gui)
     path <- treeSelectionGetSelectedRows sel
-    let idx = P.head (P.head path)
-    hsVal <- listStoreGetValue (guiInstHitViewModel gui) idx
-    listStoreSetValue (guiInstHitViewModel gui) idx (f hsVal af)
+    case path of
+        ((idx:_):_) -> do
+            hsVal <- listStoreGetValue (guiInstHitViewModel gui) idx
+            listStoreSetValue (guiInstHitViewModel gui) idx (f hsVal af)
+        _ -> return ()
 
 
 loadSamples :: InstrumentPage -> IO [FilePath]
@@ -1166,3 +1170,47 @@ changeChannel gui = do
                         ls = guiInstSamplesViewModel gui
 
                     mapM_ modif lst
+
+                    afs <- listStoreToList ls
+                    updateHitSample gui hsReplaceSamples afs
+
+
+
+
+getSelectedAudioFiles :: InstrumentPage -> IO [AudioFile]
+getSelectedAudioFiles gui = do
+    sel <- treeViewGetSelection (guiInstSamplesView gui)
+    rows <- treeSelectionGetSelectedRows sel
+    let ls = guiInstSamplesViewModel gui
+    mapM (listStoreGetValue ls) (P.concat rows)
+
+
+
+addNewHitSample :: InstrumentPage -> [AudioFile] -> IO ()
+addNewHitSample gui afs = do
+    instName <- entryGetText (guiEntryName gui)
+    j <- listStoreGetSize (guiInstHitViewModel gui)
+    let defSample x = HitSample (smplName x) (fromIntegral x) afs
+        smplName x = instName `append` "-" `append` pack (show x)
+    idx <- listStoreAppend (guiInstHitViewModel gui) (defSample (j + 1))
+    treeViewSetCursor (guiInstHitView gui) [idx] Nothing
+    activateRow (guiInstHitView gui) idx
+
+
+
+toNewHitSample :: InstrumentPage -> IO ()
+toNewHitSample gui = do
+    afs <- getSelectedAudioFiles gui
+
+    -- get the selected hit sample and remove the audio samples
+    -- then get the drop destination hit sample and add the samples
+    sel <- treeViewGetSelection (guiInstHitView gui)
+    srcx' <- treeSelectionGetSelectedRows sel
+    case srcx' of
+        ((srcx:_):_) -> do
+            let ls = guiInstHitViewModel gui
+            src <- listStoreGetValue ls srcx
+            listStoreSetValue ls srcx (hsRemoveSamples src afs)
+            addNewHitSample gui afs
+
+        _ -> return ()
