@@ -39,7 +39,7 @@ import Data.Import
 import Data.Maybe
 import Data.Char (isSpace)
 import Data.Either
---import Data.List as L (intercalate)
+import Data.List as L (elemIndex)
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 
@@ -85,7 +85,8 @@ data InstrumentPage = InstrumentPage {
     guiSpinSpread :: SpinButton,
     guiInstFhDialog :: FileHandlingDialog,
     guiInstErrDialog :: ErrorDialog,
-    guiInstNrHits :: NrHitsDialog
+    guiInstNrHits :: NrHitsDialog,
+    guiComboChannel :: ComboBox
     }
 
 
@@ -114,6 +115,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     popUp <- builderGetObject builder castToMenu ("menuAudioSamples" :: Text)
     menuAddSamples <- builderGetObject builder castToMenuItem ("menuitemAdd" :: Text)
     menuRemoveSample <- builderGetObject builder castToMenuItem ("menuitemRemove" :: Text)
+    menuSelectFC <- builderGetObject builder castToMenuItem ("menuitemSelectFC" :: Text)
 
     hitPopUp <- builderGetObject builder castToMenu ("menuHits" :: Text)
     menuAddHitSample <- builderGetObject builder castToMenuItem ("menuitemAddHitSample" :: Text)
@@ -124,6 +126,9 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     spinSpread <- builderGetObject builder castToSpinButton ("spinbuttonSpread" :: Text)
     calcHitB <- builderGetObject builder castToButton ("buttonCalcHits" :: Text)
     loadInst <- builderGetObject builder castToButton ("buttonLoadInstrument" :: Text)
+
+    comboChan <- builderGetObject builder castToComboBox ("comboboxChannel" :: Text)
+    initChannelCombo comboChan
 
     nrHitsDiag <- initNrHitsDialog builder
 
@@ -161,7 +166,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
         guiSpinSpread = spinSpread,
         guiInstFhDialog = fhDialog,
         guiInstErrDialog = errDiag,
-        guiInstNrHits = nrHitsDiag
+        guiInstNrHits = nrHitsDiag,
+        guiComboChannel = comboChan
         }
 
     -- set the default values for this instrument page
@@ -178,6 +184,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
 
     void $ on menuAddSamples menuItemActivate (addSamples gui)
     void $ on menuRemoveSample menuItemActivate (removeAudioSamples gui)
+    void $ on menuSelectFC menuItemActivate (selectAllFC gui)
 
     void $ on menuAddHitSample menuItemActivate (addHitPower gui)
     void $ on menuRemoveHitSample menuItemActivate (removeHitPower gui)
@@ -190,6 +197,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
 
     void $ on calcHitB buttonActivated (calcPower gui)
     void $ on loadInst buttonActivated (loadInstrument gui)
+
+    void $ on comboChan changed (changeChannel gui)
 
     -- setup the local callbacks for the treeviews
     setupCallbacks gui
@@ -607,6 +616,16 @@ setupCallbacks instPage = do
     void $ on hitview rowActivated $ \(i:_) _ -> do
         !row <- listStoreGetValue hitviewModel i
         setListStoreTo (guiInstSamplesViewModel instPage) (hsSamples row)
+        return ()
+
+    -- on doubleclick on a audio sample set the channel combo box
+    void $ on (guiInstSamplesView instPage) rowActivated $ \(i:_) _ -> do
+        !row <- listStoreGetValue (guiInstSamplesViewModel instPage) i
+        let chan = afChannel row
+            idx = elemIndex chan chanList
+        case idx of
+            Nothing -> return ()
+            Just x -> comboBoxSetActive (guiComboChannel instPage) x
         return ()
 
     -- right click on the samples view shows the popup to add/remove audio samples)
@@ -1107,3 +1126,43 @@ getXMLFile gui = do
     return res
 
 
+
+selectAllFC :: InstrumentPage -> IO ()
+selectAllFC gui = do
+    sel <- treeViewGetSelection (guiInstSamplesView gui)
+    s <- treeSelectionGetSelectedRows sel
+    case s of
+        ((i:_):_) -> do
+            val <- listStoreGetValue (guiInstSamplesViewModel gui) i
+            lst <- P.zip [0..] <$> listStoreToList (guiInstSamplesViewModel gui)
+            let filech = afFileChannel val
+                indexes = P.map fst . P.filter ((== filech) . afFileChannel . snd) $ lst
+            mapM_ (\x -> treeSelectionSelectPath sel [x]) indexes
+        _ -> return ()
+
+
+
+initChannelCombo :: ComboBox -> IO ()
+initChannelCombo cb = do
+    void $ comboBoxSetModelText cb
+    void $ mapM (comboBoxAppendText cb) chanList
+
+
+changeChannel :: InstrumentPage -> IO ()
+changeChannel gui = do
+    sel <- treeViewGetSelection (guiInstSamplesView gui)
+    s <- treeSelectionGetSelectedRows sel
+    case s of
+        [] -> return ()
+        lst -> do
+            chan' <- comboBoxGetActiveText (guiComboChannel gui)
+            case chan' of
+                Nothing -> return ()
+                Just chan -> do
+                    let modif [] = return ()
+                        modif (x:_) = do
+                            val <- listStoreGetValue ls x
+                            listStoreSetValue ls x (val {afChannel = chan})
+                        ls = guiInstSamplesViewModel gui
+
+                    mapM_ modif lst

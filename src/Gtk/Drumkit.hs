@@ -145,6 +145,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     btCompileGM <- builderGetObject builder castToButton ("buttonCompileFromKitGM" :: Text)
     btCompileDef <- builderGetObject builder castToButton ("buttonCompileFromKitDefault" :: Text)
 
+    btUp <- builderGetObject builder castToButton ("buttonUp" :: Text)
+    btDown <- builderGetObject builder castToButton ("buttonDown" :: Text)
+
 
     let gui = DrumkitPage{
             guiDkParentWindow = mainWindow,
@@ -205,6 +208,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     void $ G.on btCompileGM buttonActivated $ compileMidiMapGM gui
     void $ G.on btCompileDef buttonActivated $ compileMidiMapDefault gui
+
+    void $ G.on btUp buttonActivated $ channelUp gui
+    void $ G.on btDown buttonActivated $ channelDown gui
 
     setupCallbacks gui
 
@@ -1061,3 +1067,27 @@ compileMidiMapDefault gui = do
             setMidiMap (guiMidiMapDef gui) midimap
 
 
+channelUp :: DrumkitPage -> IO ()
+channelUp gui = do
+    sel1 <- treeViewGetSelection (guiTvChannels gui)
+    s1 <- treeSelectionGetSelectedRows sel1
+    case s1 of
+        ((i:_):_) -> do
+            let ls = guiTvChannelsModel gui
+            ch <- listStoreGetValue ls i
+            listStoreInsert ls (i - 1) ch
+            listStoreRemove ls i
+        _ -> return ()
+
+
+channelDown :: DrumkitPage -> IO ()
+channelDown gui = do
+    sel1 <- treeViewGetSelection (guiTvChannels gui)
+    s1 <- treeSelectionGetSelectedRows sel1
+    case s1 of
+        ((i:_):_) -> do
+            let ls = guiTvChannelsModel gui
+            ch <- listStoreGetValue ls i
+            listStoreInsert ls (i + 1) ch
+            listStoreRemove ls i
+        _ -> return ()
