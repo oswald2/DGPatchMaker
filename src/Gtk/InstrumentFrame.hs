@@ -927,9 +927,12 @@ instrumentPageWriteInstrumentFile instPage = do
                 dgInstrumentsPath = getInstrumentDir basepath
                 filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
 
-            askUserForOverwriteIfNecessary (guiInstFhDialog instPage) filename $ writeInstrumentXML instrumentFile filename
-
-            return $ Right filename
+            dirs <- createDrumgizmoDirectories basepath
+            case dirs of
+                Left err -> return $ Left err
+                Right _ -> do
+                    askUserForOverwriteIfNecessary (guiInstFhDialog instPage) filename $ writeInstrumentXML instrumentFile filename
+                    return $ Right filename
 
 
 validateName :: InstrumentPage -> IO ()
@@ -1192,9 +1195,7 @@ addNewHitSample gui afs = do
     j <- listStoreGetSize (guiInstHitViewModel gui)
     let defSample x = HitSample (smplName x) (fromIntegral x) afs
         smplName x = instName `append` "-" `append` pack (show x)
-    idx <- listStoreAppend (guiInstHitViewModel gui) (defSample (j + 1))
-    treeViewSetCursor (guiInstHitView gui) [idx] Nothing
-    activateRow (guiInstHitView gui) idx
+    void $ listStoreAppend (guiInstHitViewModel gui) (defSample (j + 1))
 
 
 

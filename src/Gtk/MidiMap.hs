@@ -309,8 +309,10 @@ writeMidiMapFile' gui filename midimap = do
         path = getDrumgizmoDir basepath </> unpack filename
         path2 = replaceExtension path ".txt"
 
-    askUserForOverwriteIfNecessary (mmFhDialog gui) path $ writeMidiMapXML midimap path
-    L.writeFile path2 content2
+    res <- askUserForOverwriteIfNecessary (mmFhDialog gui) path $ writeMidiMapXML midimap path
+    case res of
+        Left err -> displayErrorBox (mmMainWindow gui) err
+        Right _ -> L.writeFile path2 content2
 
 
 

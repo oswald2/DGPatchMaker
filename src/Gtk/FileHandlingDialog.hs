@@ -12,12 +12,11 @@ where
 
 
 import Control.Monad (void)
-import Control.Exception (bracket)
+import Control.Exception (bracket, catch, SomeException(..))
 import Data.Text
 import Graphics.UI.Gtk
 import Data.IORef
 import System.Directory
-
 
 data FileHandlingDialog = FileHandlingDialog {
     guiFhDialog :: MessageDialog,
@@ -63,7 +62,7 @@ setValue gui handling = do
     writeIORef (guiFhValue gui) handling
     dialogResponse (guiFhDialog gui) (ResponseUser (fromEnum handling))
 
-askUserForOverwriteIfNecessary :: FileHandlingDialog -> FilePath -> (IO ()) -> IO ()
+askUserForOverwriteIfNecessary :: FileHandlingDialog -> FilePath -> (IO ()) -> IO (Either Text ())
 askUserForOverwriteIfNecessary diag file writeAction = do
     let dialog = guiFhDialog diag
         txt = "File '" `append` pack file `append` "' does already exist."
@@ -90,10 +89,16 @@ askUserForOverwriteIfNecessary diag file writeAction = do
                 OverwriteAll -> return OverwriteFile
 
             case v of
-                SkipFile -> return ()
-                OverwriteFile -> writeAction
-        False -> writeAction
-
+                SkipFile -> return (Right ())
+                OverwriteFile -> writeAction'
+        False -> writeAction'
+    where
+        writeAction' = do
+            catch (writeAction >> return (Right ()))
+                  (\e -> do
+                        let err = show (e :: SomeException)
+                        return (Left (pack err))
+                  )
 
 
 withFileHandlingDialog :: FileHandlingDialog -> (IO a) -> IO a

@@ -732,10 +732,12 @@ writeDrumKitFile' gui nm basepath = do
 
                     setDrumkit gui d'
 
-                    askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
-
-                    -- also export the instrument files
-                    exportInstruments gui
+                    res <- askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
+                    case res of
+                        Left err -> displayErrorBox (guiDkParentWindow gui) err
+                        Right _ -> do
+                            -- also export the instrument files
+                            exportInstruments gui
 
 
 
@@ -781,7 +783,10 @@ saveDrumkit gui = do
                                     drumkitFName = if takeExtension drumkitFName' == ".xml" then drumkitFName' else addExtension drumkitFName' ".xml"
                                 setDrumkit gui d'
 
-                                askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
+                                res <- askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
+                                case res of
+                                    Left err -> displayErrorBox (guiDkParentWindow gui) err
+                                    Right _ -> return ()
                 _ -> return ()
         _ -> return ()
     widgetHide dialog
