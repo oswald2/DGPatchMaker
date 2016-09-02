@@ -6,9 +6,10 @@ where
 
 import ClassyPrelude
 
+import Data.Char
 
 import Graphics.UI.Gtk
-import Data.Text as T
+import Data.Text as T hiding (map)
 
 
 displayErrorBox :: Window -> Text -> IO ()
@@ -43,8 +44,29 @@ setListStoreTo ls xs = do
     listStoreClear ls
     mapM_ (void . listStoreAppend ls) xs
 
+
+
+listStoreMap :: ListStore a -> (a -> a) -> IO ()
+listStoreMap ls f = do
+    xs <- listStoreToList ls
+    let newxs = map f xs
+    setListStoreTo ls newxs
+
+
+
 activateRow :: TreeView -> Int -> IO ()
 activateRow tv idx = do
     Just col <- treeViewGetColumn tv 0
     treeViewRowActivated tv [idx] col
+
+
+isLeftChannel :: Text -> Bool
+isLeftChannel x | T.last x == 'L' = True
+         | isDigit (T.last x) && (T.last (T.dropEnd 1 x)) == 'L' = True
+         | otherwise = False
+
+isRightChannel :: Text -> Bool
+isRightChannel x | T.last x == 'R' = True
+         | isDigit (T.last x) && (T.last (T.dropEnd 1 x)) == 'R' = True
+         | otherwise = False
 

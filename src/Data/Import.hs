@@ -15,7 +15,7 @@ import Text.XML.Stream.Parse
 import Data.XML.Types
 --import Data.Maybe
 import Data.Either
-
+import System.FilePath
 --import Data.Monoid ((<>))
 
 import Control.Monad.Trans.Resource
@@ -57,14 +57,14 @@ importMidiMap path = do
 
 
 
-parseInstrument :: MonadThrow m => ConduitM Event o m (Maybe InstrumentFile)
-parseInstrument = do
+parseInstrument :: MonadThrow m => FilePath -> ConduitM Event o m (Maybe InstrumentFile)
+parseInstrument fname = do
     inst <- tagName "instrument" ((,) <$> requireAttr "version" <*> requireAttr "name") $
         \(version, name) -> do
             smpls <- tagNoAttr "samples" $ many parseSamples
             return (version, name, smpls)
     case inst of
-        Just (vers, nam, Just smpl) -> return $ Just (InstrumentFile vers nam Nothing smpl)
+        Just (vers, nam, Just smpl) -> return $ Just (InstrumentFile vers nam (pack fname) Nothing smpl)
         _ -> return Nothing
 
 
@@ -105,7 +105,7 @@ importInstrumentFile path = do
     where
         worker = do
             iF <- runResourceT $
-                parseFile def path $$ parseInstrument
+                parseFile def path $$ parseInstrument (takeFileName path)
             return (maybe (Left "Could not parse file") Right iF)
         handler e = return (Left (dkpeMsg e))
         handler2 XmlException{..} = do

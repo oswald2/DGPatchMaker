@@ -117,6 +117,7 @@ getMic = hMicType
 data InstrumentFile = InstrumentFile {
     ifVersion :: !Text,
     ifName :: !Text,
+    ifFileName :: !Text,
     ifType :: Maybe Instrument,
     ifSamples :: [HitSample]
 } deriving Show
@@ -254,6 +255,9 @@ micToInt Undefined = 100
 instance Eq Microphones where
     x1 == x2 = (micToInt x1) == (micToInt x2)
 
+
+
+
 micParser :: Parsec Text u Microphones
 micParser = do
     (try (string "KickC"        ) >> return KickC       )
@@ -328,7 +332,7 @@ instrumentFileToChannelMap :: InstrumentFile -> ChannelMap
 instrumentFileToChannelMap ifl =
     ChannelMap (ifName ifl) (grp (ifType ifl)) filePath (ifType ifl) chans (cmCheckUndefined chans)
     where
-        filePath = "Instruments" </> unpack (ifName ifl) <.> "xml"
+        filePath = "Instruments" </> unpack (ifFileName ifl)
         grp (Just t) | t == HiHat = Just "hihat"
         grp _ = Nothing
         chans' = getAvailableChannelsIF ifl S.empty

@@ -12,11 +12,13 @@ module Gtk.InstrumentFrame
     ,instrumentPageGetInstrumentName
     ,instrumentPageGetInstrumentFile
     ,instrumentPageLoadFile
+    ,instrumentPageConvertToFullMix
     )
 where
 
 import Control.Monad (void, when, forM_)
 import Control.Monad.IO.Class (liftIO)
+import Data.Monoid ((<>))
 import Control.Exception (bracket, catch, SomeException(..))
 
 import Prelude as P
@@ -86,7 +88,8 @@ data InstrumentPage = InstrumentPage {
     guiInstFhDialog :: FileHandlingDialog,
     guiInstErrDialog :: ErrorDialog,
     guiInstNrHits :: NrHitsDialog,
-    guiComboChannel :: ComboBox
+    guiComboChannel :: ComboBox,
+    guiEntryFileName :: Entry
     }
 
 
@@ -111,6 +114,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     entryVersion <- builderGetObject builder castToEntry ("entryVersion" :: Text)
     entryName <- builderGetObject builder castToEntry ("entryName" :: Text)
     entryType <- builderGetObject builder castToEntry ("entryType" :: Text)
+    entryFileName <- builderGetObject builder castToEntry ("entryFileName" :: Text)
 
     popUp <- builderGetObject builder castToMenu ("menuAudioSamples" :: Text)
     menuAddSamples <- builderGetObject builder castToMenuItem ("menuitemAdd" :: Text)
@@ -168,7 +172,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
         guiInstFhDialog = fhDialog,
         guiInstErrDialog = errDiag,
         guiInstNrHits = nrHitsDiag,
-        guiComboChannel = comboChan
+        guiComboChannel = comboChan,
+        guiEntryFileName = entryFileName
         }
 
     -- set the default values for this instrument page
@@ -599,6 +604,7 @@ instrumentPageSetInstrumentFile instPage instrumentFile = do
     entrySetText (guiEntryVersion instPage) (ifVersion instrumentFile)
     entrySetText (guiEntryName instPage) (ifName instrumentFile)
     entrySetText (guiEntryType instPage) (maybe "" (pack . show) (ifType instrumentFile))
+    entrySetText (guiEntryFileName instPage) (ifFileName instrumentFile)
 
     let model = guiInstHitViewModel instPage
 
@@ -877,18 +883,17 @@ getInstrumentFromGUI instPage = do
     name <- entryGetText (guiEntryName instPage)
     t <- entryGetText (guiEntryType instPage)
     samples <- listStoreToList (guiInstHitViewModel instPage)
-
-    T.putStrLn $ name `append` " Type: " `append` t
+    fname <- entryGetText (guiEntryFileName instPage)
 
     let version = dgDefaultVersion
         t' = validate "Type" t
 
     case t' of
         Left _  -> do
-            let res = InstrumentFile version name Nothing samples
+            let res = InstrumentFile version name fname Nothing samples
             return (Right res)
         Right typ -> do
-            let res = InstrumentFile version name (Just typ) samples
+            let res = InstrumentFile version name fname (Just typ) samples
             return (Right res)
 
 
@@ -925,14 +930,16 @@ instrumentPageWriteInstrumentFile instPage = do
 
             let
                 dgInstrumentsPath = getInstrumentDir basepath
-                filename = dgInstrumentsPath </> T.unpack (ifName instrumentFile) <.> "xml"
+                filename = dgInstrumentsPath </> T.unpack (ifFileName instrumentFile)
 
             dirs <- createDrumgizmoDirectories basepath
             case dirs of
                 Left err -> return $ Left err
                 Right _ -> do
-                    askUserForOverwriteIfNecessary (guiInstFhDialog instPage) filename $ writeInstrumentXML instrumentFile filename
-                    return $ Right filename
+                    res <- askUserForOverwriteIfNecessary (guiInstFhDialog instPage) filename $ writeInstrumentXML instrumentFile filename
+                    case res of
+                        Left err -> return $ Left err
+                        Right _ -> return $ Right filename
 
 
 validateName :: InstrumentPage -> IO ()
@@ -1215,3 +1222,33 @@ toNewHitSample gui = do
             addNewHitSample gui afs
 
         _ -> return ()
+
+
+instrumentPageConvertToFullMix :: InstrumentPage -> IO ()
+instrumentPageConvertToFullMix = convertToFullMix
+
+
+convertToFullMix :: InstrumentPage -> IO ()
+convertToFullMix gui = do
+    i <- readIORef (guiInstFile gui)
+    case i of
+        Just iF -> do
+            let newSamples = P.map toStereo (ifSamples iF)
+                newIF = iF {ifFileName = newName, ifSamples = newSamples}
+                newName = pack . (<> "FL.xml") . dropExtension . unpack . ifFileName $ iF
+
+            listStoreClear (guiInstSamplesViewModel gui)
+            instrumentPageSetInstrumentFile gui newIF
+        Nothing -> return ()
+
+
+toStereo :: HitSample -> HitSample
+toStereo hs = hs { hsSamples = func (hsSamples hs) }
+    where
+        func :: [AudioFile] -> [AudioFile]
+        func [] = []
+        func ((x@AudioFile {afChannel = ch}) : xs)
+            | isLeftChannel ch = x : func xs
+            | isRightChannel ch = x : func xs
+            | otherwise = x {afChannel = ch `snoc` 'L'} : x {afChannel = ch `snoc` 'R'} : func xs
+

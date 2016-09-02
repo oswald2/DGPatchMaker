@@ -13,7 +13,7 @@ import System.FilePath
 
 import Data.Types
 import Data.DrumDrops.Utils
-import Data.Char (isSpace, isDigit)
+import Data.Char (isSpace)
 import Data.Export
 import Data.Drumgizmo
 import Data.Import
@@ -22,7 +22,7 @@ import Data.Either
 
 import qualified Data.Vector as V
 
-import Data.Text as T (last, dropEnd)
+--import Data.Text as T (last, dropEnd)
 --import Data.IORef
 import qualified Data.Set as S
 
@@ -978,8 +978,14 @@ loadInstrumentFiles gui path files = do
             instrumentPageLoadFile ins (path </> (cmFile cm))
 
 
+-- Can't do it this way, as the channel mapping must be unique. What we got this
+-- way was, that even if in the channel mapping was (Close -> L and Close -> R)
+-- only the right channel was played as Close is ambigous.
 
-convertToFullMix :: DrumkitPage -> IO ()
+-- Solution is to convert the instruments themselves to stereo and perform a new
+-- mapping
+
+{-convertToFullMix :: DrumkitPage -> IO ()
 convertToFullMix gui = do
     -- got through all instruments an change the channel mapping to Full Mix
     mapInsts gui convert
@@ -996,18 +1002,33 @@ convertToFullMix gui = do
         func :: [(Text, Text)] -> [(Text, Text)]
         func [] = []
         func ((inc, outc) : xs) | isLeftChannel outc = (inc, pack (showMic FullMixL)) : func xs
-                                | isRightChannel outc = (inc, pack (showMic FullMixR)) : func xs
-                                | otherwise = (inc, pack (showMic FullMixL)) : (inc, pack (showMic FullMixR)) : func xs
+                                 | isRightChannel outc = (inc, pack (showMic FullMixR)) : func xs
+                                 | otherwise = (inc, pack (showMic FullMixL)) : (inc, pack (showMic FullMixR)) : func xs-}
 
-isLeftChannel :: Text -> Bool
-isLeftChannel x | T.last x == 'L' = True
-         | isDigit (T.last x) && (T.last (T.dropEnd 1 x)) == 'L' = True
-         | otherwise = False
+convertToFullMix :: DrumkitPage -> IO ()
+convertToFullMix gui = do
+    -- first create the new stereo channels by mapping over all instrument pages
+    v <- readIORef (guiDkInstrumentPages gui)
+    V.mapM_ instrumentPageConvertToFullMix v
+    -- then compile a new drumkit
+    compileDrumkit gui
+    -- got through all instruments an change the channel mapping to Full Mix
+    mapInsts gui convert
 
-isRightChannel :: Text -> Bool
-isRightChannel x | T.last x == 'R' = True
-         | isDigit (T.last x) && (T.last (T.dropEnd 1 x)) == 'R' = True
-         | otherwise = False
+    -- remove all channels and add the FullMix channels
+    setListStoreTo (guiTvChannelsModel gui) (map (pack.showMic) [FullMixL, FullMixR])
+
+    listStoreClear (guiTvChannelMapModel gui)
+
+    return ()
+    where
+        convert :: ChannelMap -> ChannelMap
+        convert x = x { cmMap = func (cmMap x) }
+        func :: [(Text, Text)] -> [(Text, Text)]
+        func [] = []
+        func ((inc, outc) : xs) | isLeftChannel outc = (inc, pack (showMic FullMixL)) : func xs
+                                 | isRightChannel outc = (inc, pack (showMic FullMixR)) : func xs
+                                 | otherwise = (inc, pack (showMic FullMixL)) : (inc, pack (showMic FullMixR)) : func xs
 
 
 

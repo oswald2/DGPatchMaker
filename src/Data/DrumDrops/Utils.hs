@@ -125,13 +125,13 @@ determineChannel parserType sample channel = pack . showMic $
 
 convertSampleGroup :: ParserType -> FilePath -> SampleGroup -> InstrumentFile
 convertSampleGroup parserType basepath sg =
-    InstrumentFile dgDefaultVersion nm (Just (sgInstrument sg)) groups
+    InstrumentFile dgDefaultVersion nm fname (Just (sgInstrument sg)) groups
     where
         nm = sgInstName sg
         vname :: Int -> Text
         vname i = nm `append` pack (show i)
         groups = P.zipWith (\vg i -> convertVelocityGroup parserType (vname i) (sgPath sg) basepath vg) (sgGroups sg) [1..]
-
+        fname = nm `append` ".xml"
 
 
 convertVelocityGroup :: ParserType -> Text -> FilePath -> FilePath -> VelocityGroup -> HitSample
