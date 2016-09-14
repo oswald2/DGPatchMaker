@@ -16,7 +16,7 @@ module Gtk.InstrumentFrame
     )
 where
 
-import Control.Monad (void, when, forM_)
+import Control.Monad (void, when, unless, forM_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Monoid ((<>))
 import Control.Exception (bracket, catch, SomeException(..))
@@ -52,6 +52,7 @@ import System.FilePath
 import Gtk.InstrumentPageBuilder
 import Gtk.ErrorDialog
 import Gtk.NrHitsDialog
+import Gtk.HitPowerDialog
 
 import Network.URI (unEscapeString)
 
@@ -89,7 +90,8 @@ data InstrumentPage = InstrumentPage {
     guiInstErrDialog :: ErrorDialog,
     guiInstNrHits :: NrHitsDialog,
     guiComboChannel :: ComboBox,
-    guiEntryFileName :: Entry
+    guiEntryFileName :: Entry,
+    guiHitPowerDialog :: HitPowerDialog
     }
 
 
@@ -121,11 +123,14 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     menuRemoveSample <- builderGetObject builder castToMenuItem ("menuitemRemove" :: Text)
     menuSelectFC <- builderGetObject builder castToMenuItem ("menuitemSelectFC" :: Text)
     menuAddNewHS <- builderGetObject builder castToMenuItem ("menuitemToNewHS" :: Text)
+    menuAddMultipleNew <- builderGetObject builder castToMenuItem ("menuitemAddToMultipleHits" :: Text)
 
     hitPopUp <- builderGetObject builder castToMenu ("menuHits" :: Text)
     menuAddHitSample <- builderGetObject builder castToMenuItem ("menuitemAddHitSample" :: Text)
     menuRemoveHitSample <- builderGetObject builder castToMenuItem ("menuitemRemoveHitSample" :: Text)
     menuAddNrHits <- builderGetObject builder castToMenuItem ("menuitemAddMultiple" :: Text)
+    menuSetHitPower <- builderGetObject builder castToMenuItem ("menuitemSetHitPower" :: Text)
+    menuSetEqualHP <- builderGetObject builder castToMenuItem ("menuitemEqualHP" :: Text)
 
     spinAttack <- builderGetObject builder castToSpinButton ("spinbuttonAttack" :: Text)
     spinSpread <- builderGetObject builder castToSpinButton ("spinbuttonSpread" :: Text)
@@ -136,6 +141,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     initChannelCombo comboChan
 
     nrHitsDiag <- initNrHitsDialog builder
+    hitPowerDiag <- initHitPowerDialog builder
 
     hsls <- listStoreNew []
     (rendererHPName, rendererHP) <- initTreeViewHit treeviewHit hsls
@@ -173,7 +179,8 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
         guiInstErrDialog = errDiag,
         guiInstNrHits = nrHitsDiag,
         guiComboChannel = comboChan,
-        guiEntryFileName = entryFileName
+        guiEntryFileName = entryFileName,
+        guiHitPowerDialog = hitPowerDiag
         }
 
     -- set the default values for this instrument page
@@ -192,10 +199,13 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
     void $ on menuRemoveSample menuItemActivate (removeAudioSamples gui)
     void $ on menuSelectFC menuItemActivate (selectAllFC gui)
     void $ on menuAddNewHS menuItemActivate (toNewHitSample gui)
+    void $ on menuAddMultipleNew menuItemActivate (toNewMultipleHitSamples gui)
 
     void $ on menuAddHitSample menuItemActivate (addHitPower gui)
     void $ on menuRemoveHitSample menuItemActivate (removeHitPower gui)
     void $ on menuAddNrHits menuItemActivate (addMultipleHits gui)
+    void $ on menuSetHitPower menuItemActivate (setLinearHitPower gui)
+    void $ on menuSetEqualHP menuItemActivate (setEqualHitPower gui)
 
     void $ on treeviewSamples dragDataReceived $ dragDataReceivedSignal gui
     void $ on treeviewSamples dragDataGet $ dragDataGetSignal gui
@@ -754,7 +764,7 @@ treeViewIsSelected tv = do
 addSamples :: InstrumentPage -> IO ()
 addSamples gui = do
     names <- loadSamples gui
-    when (not (P.null names)) $ do
+    unless (P.null names) $ do
         basepath <- unpack <$> entryGetText (guiIPEntryBaseDir gui)
         af <- getAudioSamplesFromFiles basepath names
         mapM_ (listStoreAppend (guiInstSamplesViewModel gui)) af
@@ -948,6 +958,9 @@ validateName instPage = do
     let nm' = T.filter (not . isSpace) nm
     entrySetText (guiEntryName instPage) nm'
     setCurrentNotebookLabel instPage nm'
+    fn <- entryGetText (guiEntryFileName instPage)
+    when (T.null fn) $ do
+        entrySetText (guiEntryFileName instPage) (nm' `append` ".xml")
 
 
 
@@ -1043,7 +1056,7 @@ calcPower gui = do
         Right _ -> do
             afs <- listStoreToList (guiInstSamplesViewModel gui)
 
-            when (not (P.null afs)) $ do
+            unless (P.null afs) $ do
                 -- do the calculation
                 res <- mapM (calcHit basepath attack spread) afs
 
@@ -1194,6 +1207,11 @@ getSelectedAudioFiles gui = do
     let ls = guiInstSamplesViewModel gui
     mapM (listStoreGetValue ls) (P.concat rows)
 
+getIndexAudioFiles :: InstrumentPage -> [Int] -> IO [AudioFile]
+getIndexAudioFiles gui idxs = do
+    let ls = guiInstSamplesViewModel gui
+    n <- listStoreGetSize ls
+    mapM (listStoreGetValue ls) (P.filter (< n) idxs)
 
 
 addNewHitSample :: InstrumentPage -> [AudioFile] -> IO ()
@@ -1216,12 +1234,42 @@ toNewHitSample gui = do
     srcx' <- treeSelectionGetSelectedRows sel
     case srcx' of
         ((srcx:_):_) -> do
-            let ls = guiInstHitViewModel gui
-            src <- listStoreGetValue ls srcx
-            listStoreSetValue ls srcx (hsRemoveSamples src afs)
-            addNewHitSample gui afs
-
+            toNewHitSample' gui srcx afs
         _ -> return ()
+
+
+toNewHitSample' :: InstrumentPage -> Int -> [AudioFile] -> IO ()
+toNewHitSample' gui srcx afs = do
+    let ls = guiInstHitViewModel gui
+    src <- listStoreGetValue ls srcx
+    let removed = hsRemoveSamples src afs
+    listStoreSetValue ls srcx removed
+    addNewHitSample gui afs
+    setListStoreTo (guiInstSamplesViewModel gui) (hsSamples removed)
+
+
+
+toNewMultipleHitSamples :: InstrumentPage -> IO ()
+toNewMultipleHitSamples gui = do
+    sel <- treeViewGetSelection (guiInstHitView gui)
+    srcx' <- treeSelectionGetSelectedRows sel
+    case srcx' of
+        ((srcx:_):_) -> do
+            sel1 <- treeViewGetSelection (guiInstSamplesView gui)
+            s <- treeSelectionGetSelectedRows sel1
+            case s of
+                [] -> return ()
+                lst -> do
+                    let ls = P.concat lst
+                        worker = do
+                            afs <- getIndexAudioFiles gui ls
+                            if P.null afs then return ()
+                                else do
+                                    toNewHitSample' gui srcx afs
+                                    worker
+                    worker
+        _ -> return ()
+
 
 
 instrumentPageConvertToFullMix :: InstrumentPage -> IO ()
@@ -1252,3 +1300,27 @@ toStereo hs = hs { hsSamples = func (hsSamples hs) }
             | isRightChannel ch = x : func xs
             | otherwise = x {afChannel = ch `snoc` 'L'} : x {afChannel = ch `snoc` 'R'} : func xs
 
+
+
+setLinearHitPower :: InstrumentPage -> IO ()
+setLinearHitPower gui = do
+    res <- dialogGetHitParams (guiHitPowerDialog gui)
+    case res of
+        Nothing -> return ()
+        Just (HitPowerDialogResult start stop step) -> do
+            let values = if start == stop then [start..] else P.concatMap (P.replicate step) [start .. stop]
+            lst <- listStoreToList (guiInstHitViewModel gui)
+            setListStoreTo (guiInstHitViewModel gui) $ P.zipWith (\x y -> x {hsPower = fromIntegral y}) lst values
+
+
+setEqualHitPower :: InstrumentPage -> IO ()
+setEqualHitPower gui = do
+    dialogEqualEnable (guiHitPowerDialog gui) False
+    res <- dialogGetHitParams (guiHitPowerDialog gui)
+    dialogEqualEnable (guiHitPowerDialog gui) True
+    case res of
+        Nothing -> return ()
+        Just (HitPowerDialogResult start _ _) -> do
+            let values = repeat start
+            lst <- listStoreToList (guiInstHitViewModel gui)
+            setListStoreTo (guiInstHitViewModel gui) $ P.zipWith (\x y -> x {hsPower = fromIntegral y}) lst values

@@ -64,6 +64,7 @@ executable DGPatchMaker
                        directory,
                        filepath,
                        parsec3,
+                       parsec-numbers,
                        xmlgen,
                        bytestring,
                        hsndfile,

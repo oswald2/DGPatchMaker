@@ -540,6 +540,148 @@
       </packing>
     </child>
   </object>
+  <object class="GtkAdjustment" id="adjustmentStart">
+    <property name="upper">1000</property>
+    <property name="value">1</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="adjustmentStep">
+    <property name="lower">1</property>
+    <property name="upper">1000</property>
+    <property name="value">1</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="adjustmentStop">
+    <property name="lower">1</property>
+    <property name="upper">1000</property>
+    <property name="value">127</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="GtkDialog" id="dialogHitPowerLin">
+    <property name="can_focus">False</property>
+    <property name="type_hint">dialog</property>
+    <child internal-child="vbox">
+      <object class="GtkBox" id="dialog-vbox2">
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">2</property>
+        <child internal-child="action_area">
+          <object class="GtkButtonBox" id="dialog-action_area2">
+            <property name="can_focus">False</property>
+            <property name="layout_style">end</property>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="pack_type">end</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkGrid" id="grid1">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <child>
+              <object class="GtkSpinButton" id="spinbuttonStart">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="adjustment">adjustmentStart</property>
+              </object>
+              <packing>
+                <property name="left_attach">1</property>
+                <property name="top_attach">0</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkSpinButton" id="spinbuttonStop">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="adjustment">adjustmentStop</property>
+              </object>
+              <packing>
+                <property name="left_attach">1</property>
+                <property name="top_attach">1</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkSpinButton" id="spinbuttonStep">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="adjustment">adjustmentStep</property>
+              </object>
+              <packing>
+                <property name="left_attach">1</property>
+                <property name="top_attach">2</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="label11">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="xpad">10</property>
+                <property name="label" translatable="yes">Start:</property>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">0</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="label12">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="xpad">10</property>
+                <property name="label" translatable="yes">End:</property>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">1</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="label13">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="xpad">10</property>
+                <property name="label" translatable="yes">Step:</property>
+                <property name="ellipsize">end</property>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">2</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
   <object class="GtkMenu" id="menuAudioSamples">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
@@ -575,6 +717,14 @@
         <property name="use_underline">True</property>
       </object>
     </child>
+    <child>
+      <object class="GtkMenuItem" id="menuitemAddToMultipleHits">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="label" translatable="yes">Add To Multiple New Hits...</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
   </object>
   <object class="GtkMenu" id="menuHits">
     <property name="visible">True</property>
@@ -602,6 +752,22 @@
         <property name="can_focus">False</property>
         <property name="tooltip_text" translatable="yes">Removed the selected Hit from the Instrument</property>
         <property name="label" translatable="yes">Remove Hit</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="menuitemEqualHP">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="label" translatable="yes">Set Equal Hit Power</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="menuitemSetHitPower">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="label" translatable="yes">Set Linear Hit Power...</property>
         <property name="use_underline">True</property>
       </object>
     </child>

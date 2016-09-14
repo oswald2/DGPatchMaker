@@ -56,9 +56,12 @@ checkIntList str low high ref =
 
 
 
-checkFloat :: (Fractional a) => Text -> Either Text a
+checkFloat :: (Fractional a, Read a) => Text -> Either Text a
 checkFloat str =
-    either (Left . T.pack . show) (Right . realToFrac) $ parse fl "" (T.unpack str)
+    case reads (unpack str) of
+        ((x, _) :_) -> Right x
+        _ -> Left $ "Illegal floating point value: " `append` str
+
 
 checkRational :: Text -> Either Text Rational
 checkRational str =
@@ -128,3 +131,4 @@ listSep = do
     spaces
     void $ char ','
     spaces
+
