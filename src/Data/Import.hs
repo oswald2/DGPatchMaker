@@ -36,7 +36,7 @@ instance Exception DKParseException
 
 
 parseMidiNote :: MonadThrow m => ConduitM Event o m (Maybe (Int, Text))
-parseMidiNote = tagName "map" ((,) <$> (requireAttr "note") <*> (requireAttr "instr")) $ \(note, instr) ->
+parseMidiNote = tag' "map" ((,) <$> (requireAttr "note") <*> (requireAttr "instr")) $ \(note, instr) ->
     return $ (read (unpack note), instr)
 
 
@@ -59,7 +59,7 @@ importMidiMap path = do
 
 parseInstrument :: MonadThrow m => FilePath -> ConduitM Event o m (Maybe InstrumentFile)
 parseInstrument fname = do
-    inst <- tagName "instrument" ((,) <$> requireAttr "version" <*> requireAttr "name") $
+    inst <- tag' "instrument" ((,) <$> requireAttr "version" <*> requireAttr "name") $
         \(version, name) -> do
             smpls <- tagNoAttr "samples" $ many parseSamples
             return (version, name, smpls)
@@ -71,7 +71,7 @@ parseInstrument fname = do
 
 parseSamples :: MonadThrow m => ConduitM Event o m (Maybe HitSample)
 parseSamples =
-    tagName "sample" ((,) <$> requireAttr "name" <*> requireAttr "power") $ \(name, power) -> do
+    tag' "sample" ((,) <$> requireAttr "name" <*> requireAttr "power") $ \(name, power) -> do
         af <- many parseAudioFile
         let p = double power
         if isLeft p
@@ -83,7 +83,7 @@ parseSamples =
 
 parseAudioFile :: MonadThrow m => ConduitM Event o m (Maybe AudioFile)
 parseAudioFile = do
-    tagName "audiofile" attrs $ \af -> return af
+    tag' "audiofile" attrs $ \af -> return af
     where
         attrs = do
             chan <- requireAttr "channel"
@@ -120,20 +120,21 @@ importInstrumentFile path = do
 
 conduitDrumKitXML :: MonadThrow m => ConduitM Event o m (Maybe Drumkit)
 conduitDrumKitXML = do
-    tagName "drumkit" ((,) <$> requireAttr "name" <*> requireAttr "description" ) $ \(name, description) -> do
+    tag' "drumkit" ((,,) <$> requireAttr "name" <*> requireAttr "description"
+            <*> attr "samplerate" ) $ \(name, description, samplerate) -> do
         chans <- channels
         insts <- instruments
         case (chans, insts) of
-            (Just c, Just i) -> return $ Drumkit name description c i
+            (Just c, Just i) -> return $ Drumkit name description samplerate c i
             _ -> throwM (DrumkitParseError "Cannot parse drumkit")
     where
         channels = tagNoAttr "channels" (many ch)
-        ch = tagName "channel" (requireAttr "name" ) return
+        ch = tag' "channel" (requireAttr "name" ) return
         instruments = tagNoAttr "instruments" (many ins)
-        ins = tagName "instrument" ((,,) <$> requireAttr "name" <*> attr "group" <*> requireAttr "file" ) $ \(name, group, file) -> do
+        ins = tag' "instrument" ((,,) <$> requireAttr "name" <*> attr "group" <*> requireAttr "file" ) $ \(name, group, file) -> do
             cm <- many channelmap
             return $ ChannelMap name group (unpack file) Nothing cm (cmCheckUndefined cm)
-        channelmap = tagName "channelmap" ((,) <$> requireAttr "in" <*> requireAttr "out") return
+        channelmap = tag' "channelmap" ((,) <$> requireAttr "in" <*> requireAttr "out") return
 
 
 

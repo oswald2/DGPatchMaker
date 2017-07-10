@@ -15,6 +15,7 @@ import qualified Data.IntMap.Strict as M
 data Drumkit = Drumkit {
     dkName :: !Text,
     dkDescription :: !Text,
+    dkSampleRate :: Maybe Text,
     dkChannels :: [Text],
     dkInstruments :: [ChannelMap]
 } deriving (Show)
@@ -318,10 +319,10 @@ validateMic txt =
         Right mic -> Right mic
 
 
-generateDrumkit :: Text -> Text -> [InstrumentFile] -> Drumkit
-generateDrumkit name description ifl = res
+generateDrumkit :: Text -> Text -> Maybe Text -> [InstrumentFile] -> Drumkit
+generateDrumkit name description samplerate ifl = res
     where
-        res = Drumkit name description channels chanMap
+        res = Drumkit name description samplerate channels chanMap
         channels' = getAvailableChannels ifl
         channels = toAscList channels'
 
