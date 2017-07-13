@@ -57,7 +57,7 @@ executable DGPatchMaker
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base,
                        text,
                        text-format,
                        vector,
@@ -101,7 +101,7 @@ executable ParseTest
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base,
                        text,
                        text-format,
                        vector,
@@ -141,7 +141,7 @@ executable CreateGladeSource
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base,
                        text,
                        directory,
                        filepath

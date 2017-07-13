@@ -29,7 +29,7 @@ import Control.Monad.Trans.Resource
 
 writeInstrumentXML :: InstrumentFile -> FilePath -> IO ()
 writeInstrumentXML iF filename = do
-    runResourceT $ conduitInstrumentSource iF C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
+    runResourceT $ conduitInstrumentSource iF C.=$= renderBytes (def {rsPretty = True}) C.$$ C.sinkFile filename
 
 
 conduitInstrumentSource :: Monad m => InstrumentFile -> C.Source m Event
@@ -75,13 +75,14 @@ conduitFullMidiMap mm = do
 
 writeMidiMapXML :: MidiMap -> FilePath -> IO ()
 writeMidiMapXML mp filename = do
-    runResourceT $ conduitFullMidiMap mp C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
+    runResourceT $ conduitFullMidiMap mp C.=$= renderBytes (def {rsPretty = True}) C.$$ C.sinkFile filename
 
 
 
 conduitDrumKitXML :: Monad m => Drumkit -> C.Source m Event
 conduitDrumKitXML dr =
-    tag "drumkit" (attr "name" (dkName dr) <> attr "description" (dkDescription dr)) (channels <> instruments)
+    tag "drumkit" (attr "name" (dkName dr) <> attr "description" (dkDescription dr)
+        <> optionalAttr "samplerate" (dkSampleRate dr)) (channels <> instruments)
     where
         channels = tag "channels" mempty (foldr ch mempty (dkChannels dr))
         ch x b = tag "channel" (attr "name" x) mempty <> b
@@ -101,7 +102,7 @@ conduitFullDrumKit dr = do
 
 writeDrumKitXML :: Drumkit -> FilePath -> IO ()
 writeDrumKitXML dr filename = do
-    runResourceT $ conduitFullDrumKit dr C.=$= renderText (def {rsPretty = True}) C.$$ C.sinkFile filename
+    runResourceT $ conduitFullDrumKit dr C.=$= renderBytes (def {rsPretty = True}) C.$$ C.sinkFile filename
 
 
 convertToTabSep :: MidiMap -> L.Text
