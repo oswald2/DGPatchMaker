@@ -6,7 +6,7 @@ where
 
 import ClassyPrelude
 
-import Prelude (read)
+import Prelude (read, head)
 
 import System.FilePath.Find as F
 import System.FilePath
@@ -22,7 +22,7 @@ import Data.Either
 
 import qualified Data.Vector as V
 
---import Data.Text as T (last, dropEnd)
+--import Data.Text as T (pack)
 --import Data.IORef
 import qualified Data.Set as S
 
@@ -357,11 +357,14 @@ importDrumDropsDrumKit' gui = do
                     displayMultiErrors (guiErrDiag gui) "Multiple errors happened during Import of Instruments:" errs
                     return ()
                 True -> do
-                    let insts = rights instFiles
+                    let insts :: [(InstrumentFile, Int)]
+                        insts = rights instFiles
+                        sampleRate = if null insts then 44100 else let (_, sr) = Prelude.head insts in sr
+                        --sampleRate = 44100
                     nm <- getDkName gui
                     desc <- getDkDescription gui
 
-                    let drumkit = generateDrumkit nm desc insts
+                    let drumkit = generateDrumkit nm desc (Just (pack (show sampleRate))) (map fst insts)
 
                     -- set the actual drumkit
                     setDrumkit gui drumkit
@@ -379,7 +382,7 @@ importDrumDropsDrumKit' gui = do
                     return ()
             return ()
     where
-        doImport :: FilePath -> FilePath -> [FilePath] -> IO [Either Text InstrumentFile]
+        doImport :: FilePath -> FilePath -> [FilePath] -> IO [Either Text (InstrumentFile, Int)]
         doImport basedir samplesDir paths = do
             -- import the instruments
             let progress = guiDkProgress gui
@@ -410,7 +413,7 @@ importDrumDropsDrumKit' gui = do
                 Left err -> do
                     displayErrorBox (guiDkParentWindow gui) err
                     return (Left err)
-                Right instFile -> do
+                Right r@(instFile, sampleRate) -> do
                     instrumentPageSetInstrumentFile ins instFile
 
                     -- update the progress bar
@@ -419,7 +422,7 @@ importDrumDropsDrumKit' gui = do
 
                     yield
 
-                    return (Right instFile)
+                    return (Right r)
         yield = do
             i <- eventsPending
             when (i > 0) $ do

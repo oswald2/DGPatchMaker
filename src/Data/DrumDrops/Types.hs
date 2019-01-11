@@ -48,6 +48,7 @@ data SampleGroup = SampleGroup {
     sgPath :: !FilePath,
     sgInstName :: !Text,
     sgInstrument :: !Instrument,
+    sgSampleRate :: !Int,
     sgGroups :: [VelocityGroup]
 } deriving (Show)
 

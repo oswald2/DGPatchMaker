@@ -36,7 +36,7 @@ data ParserType =
 
 
 
-importInstrument :: ParserType -> FilePath -> FilePath -> FilePath -> IO (Either Text InstrumentFile)
+importInstrument :: ParserType -> FilePath -> FilePath -> FilePath -> IO (Either Text (InstrumentFile, Int))
 importInstrument parserType basepath samplesPath path = do
 
     putStrLn $ "Importing Instrument from: " ++ path
@@ -44,7 +44,7 @@ importInstrument parserType basepath samplesPath path = do
     w <- getSamples parserType samplesPath path
     case w of
         Left err -> return (Left err)
-        Right wavFiles -> return (Right (convertSampleGroup parserType basepath wavFiles))
+        Right wavFiles -> return (Right (convertSampleGroup parserType basepath wavFiles, sgSampleRate wavFiles))
 
 
 
@@ -78,17 +78,19 @@ getSamples parserType samplesDir path = do
             -- get audio information out of the wav files
             let proc c = do
                     info <- getFileInfo (path </> c)
-                    return (getSampleFromFileName parserType c (channels info))
+                    return (getSampleFromFileName parserType c (channels info), (samplerate info))
 
             res <- mapM proc $ filter (\x -> takeExtension x == ".wav" || takeExtension x == ".WAV") cont
 
             let
-                spls = rights res
-                errors = lefts res
+                srate = if null res then 44100 else (snd.head) res
+                smpls = map fst res
+                spls = rights smpls
+                errors = lefts smpls
 
             if P.null errors
                 then do
-                    let gr = SampleGroup path (pathToInstrument samplesDir path) inst vgs
+                    let gr = SampleGroup path (pathToInstrument samplesDir path) inst srate vgs
                         inst = vgInstrument (head vgs)
                         vgs = getVelocityGroups spls
                     return (Right gr)

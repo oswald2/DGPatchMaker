@@ -376,7 +376,7 @@ importDrumDropsInstrument instPage = do
 
                     result <- importInstrument parserType basedir sampleDir instrumentDir
                     case result of
-                        Right instrumentFile -> do
+                        Right (instrumentFile, sampleRate) -> do
                             instrumentPageSetInstrumentFile instPage instrumentFile
                             return ()
                         Left err -> do
