@@ -51,8 +51,30 @@ executable DGPatchMaker
   main-is:             Main.hs
 
   -- Modules included in this executable, other than Main.
-  -- other-modules:
-
+  other-modules:
+      Data.Checkers
+      ,Data.DrumDrops.MapexKitParser
+      ,Data.DrumDrops.ModernFolkParser
+      ,Data.DrumDrops.Types
+      ,Data.DrumDrops.Utils
+      ,Data.DrumDrops.VintageFolkParser
+      ,Data.Drumgizmo
+      ,Data.Export
+      ,Data.Import
+      ,Data.Types
+      ,Gtk.Colors
+      ,Gtk.DGPatchMakerBuilder
+      ,Gtk.Drumkit
+      ,Gtk.ErrorDialog
+      ,Gtk.FileHandlingDialog
+      ,Gtk.HitPowerDialog
+      ,Gtk.InstrumentFrame
+      ,Gtk.InstrumentPageBuilder
+      ,Gtk.MainWindow
+      ,Gtk.MidiMap
+      ,Gtk.NrHitsDialog
+      ,Gtk.Utils
+      ,GtkInterface
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
 
@@ -79,7 +101,8 @@ executable DGPatchMaker
                        xml-types,
                        conduit-combinators,
                        network-uri,
-                       gtk3
+                       gtk3,
+                       file-embed
 
   ghc-options: -O2 -Wall -rtsopts
 
@@ -95,8 +118,15 @@ executable ParseTest
   main-is:             tests/ParseTest.hs
 
   -- Modules included in this executable, other than Main.
-  -- other-modules:
-
+  other-modules:
+      Data.DrumDrops.MapexKitParser
+      ,Data.DrumDrops.ModernFolkParser
+      ,Data.DrumDrops.Types
+      ,Data.DrumDrops.Utils
+      ,Data.DrumDrops.VintageFolkParser
+      ,Data.Drumgizmo
+      ,Data.Export
+      ,Data.Types
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
 

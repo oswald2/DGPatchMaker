@@ -40,6 +40,7 @@ data DrumkitPage = DrumkitPage {
     guiDkParentWindow :: Window,
     guiDkName :: Entry,
     guiDkDescription :: TextView,
+    guiDkSampleRate :: Entry,
     guiBaseDir :: Entry,
     guiSamplesDir :: Entry,
     guiBtImportDrumkit :: Button,
@@ -98,6 +99,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     tvChannelMap <- builderGetObject builder castToTreeView ("treeviewChannelMap" :: Text)
 
     eName <- builderGetObject builder castToEntry ("entryDkName" :: Text)
+    eSr <- builderGetObject builder castToEntry ("entrySampleRate" :: Text)
     eDesc <- builderGetObject builder castToTextView ("textviewDkDescription" :: Text)
 
     tvMidiGM <- builderGetObject builder castToTreeView ("treeviewMidiMapGM" :: Text)
@@ -115,10 +117,13 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     groupRenderer <- initTvInstruments tvInstruments lsinst
     outRenderer <- initTvChannelMap tvChannelMap lsm lscm
 
-    entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
-    entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
+    -- entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
+    -- entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
 
-    entrySetText eName ("MapexHeavyRockMultiVelocity" :: Text)
+    -- entrySetText eName ("MapexHeavyRockMultiVelocity" :: Text)
+    entrySetText entryBaseDirectory ("" :: FilePath)
+    entrySetText entrySamplesDir ("" :: FilePath)
+    entrySetText eName ("" :: Text)
 
     gmLoadButton <- builderGetObject builder castToButton ("buttonLoadGMMap" :: Text)
     gmExportButton <- builderGetObject builder castToButton ("buttonExportGMMap" :: Text)
@@ -161,6 +166,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
             guiDrumkit = dr,
             guiDkName = eName,
             guiDkDescription = eDesc,
+            guiDkSampleRate = eSr,
             guiBaseDir = entryBaseDirectory,
             guiSamplesDir = entrySamplesDir,
             guiBtImportDrumkit = buttonImportDrumkit,
@@ -230,11 +236,16 @@ getDkDescription dkp = do
     res <- textBufferGetText buffer start end False
     return $ filter (/= '\n') res
 
+getDkSampleRate :: DrumkitPage -> IO Text
+getDkSampleRate dkp = entryGetText (guiDkSampleRate dkp)
+
 
 setDkDescription :: DrumkitPage -> Text -> IO ()
 setDkDescription dkp desc = do
     buffer <- textViewGetBuffer (guiDkDescription dkp)
     textBufferSetText buffer desc
+
+
 
 initParserCombo :: ComboBox -> IO ()
 initParserCombo cb = do
@@ -413,7 +424,7 @@ importDrumDropsDrumKit' gui = do
                 Left err -> do
                     displayErrorBox (guiDkParentWindow gui) err
                     return (Left err)
-                Right r@(instFile, sampleRate) -> do
+                Right r@(instFile, _sampleRate) -> do
                     instrumentPageSetInstrumentFile ins instFile
 
                     -- update the progress bar
@@ -445,7 +456,7 @@ getDirectoriesToImport path = do
 
 initTvChannels :: TreeView -> ListStore Text -> IO (CellRendererText)
 initTvChannels tv ls = do
-    treeViewSetModel tv ls
+    treeViewSetModel tv (Just ls)
 
     treeViewSetHeadersVisible tv True
 
@@ -483,7 +494,7 @@ setChannels gui channels = setListStoreTo (guiTvChannelsModel gui) channels
 
 initTvInstruments :: TreeView -> ListStore ChannelMap -> IO (CellRendererText)
 initTvInstruments tv ls = do
-    treeViewSetModel tv ls
+    treeViewSetModel tv (Just ls)
 
     treeViewSetHeadersVisible tv True
 
@@ -536,7 +547,7 @@ setInstruments gui insts = setListStoreTo (guiTvInstrumentsModel gui) insts
 
 initTvChannelMap :: TreeView -> ListStore Text -> ListStore (Text, Text) -> IO (CellRendererCombo)
 initTvChannelMap tv lsMicros ls = do
-    treeViewSetModel tv ls
+    treeViewSetModel tv (Just ls)
 
     treeViewSetHeadersVisible tv True
 
@@ -843,8 +854,9 @@ compileDrumkit gui = do
         else do
             nm <- getDkName gui
             desc <- getDkDescription gui
+            sr <- getDkSampleRate gui
 
-            let drumkit = generateDrumkit nm desc insts
+            let drumkit = generateDrumkit nm desc (Just sr) insts
                 insts = rights (V.toList instF)
 
             -- set the actual drumkit

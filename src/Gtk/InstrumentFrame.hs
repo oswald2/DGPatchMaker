@@ -376,7 +376,7 @@ importDrumDropsInstrument instPage = do
 
                     result <- importInstrument parserType basedir sampleDir instrumentDir
                     case result of
-                        Right (instrumentFile, sampleRate) -> do
+                        Right (instrumentFile, _sampleRate) -> do
                             instrumentPageSetInstrumentFile instPage instrumentFile
                             return ()
                         Left err -> do
@@ -397,7 +397,7 @@ instrumentPageGetMainBox = guiInstMainBox
 
 initTreeViewHit :: TreeView -> ListStore HitSample -> IO (CellRendererText, CellRendererText)
 initTreeViewHit tv ls = do
-    treeViewSetModel tv ls
+    treeViewSetModel tv (Just ls)
 
     treeViewSetHeadersVisible tv True
 
@@ -449,7 +449,7 @@ initTreeViewHit tv ls = do
 
 initTreeViewSamples :: TreeView -> ListStore AudioFile -> IO (CellRendererCombo, CellRendererText)
 initTreeViewSamples tv ls = do
-    treeViewSetModel tv ls
+    treeViewSetModel tv (Just ls)
 
     treeViewSetHeadersVisible tv True
 

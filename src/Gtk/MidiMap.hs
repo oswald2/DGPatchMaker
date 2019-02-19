@@ -89,7 +89,7 @@ initTreeViewMM :: TreeView -> ListStore MidiMapItem -> IO CellRendererText
 initTreeViewMM tv ls = do
     sortModel <- treeModelSortNewWithModel ls
 
-    treeViewSetModel tv sortModel
+    treeViewSetModel tv (Just sortModel)
 
     treeViewSetHeadersVisible tv True
 
