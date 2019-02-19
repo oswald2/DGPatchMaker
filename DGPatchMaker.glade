@@ -466,6 +466,7 @@
                                     <property name="shadow_type">in</property>
                                     <child>
                                       <object class="GtkTreeView" id="treeviewChannels">
+                                        <property name="width_request">80</property>
                                         <property name="height_request">400</property>
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
@@ -626,6 +627,7 @@
                                         <property name="shadow_type">in</property>
                                         <child>
                                           <object class="GtkTreeView" id="treeviewChannelMap">
+                                            <property name="width_request">140</property>
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
                                             <child internal-child="selection">

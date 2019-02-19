@@ -84,7 +84,7 @@ initMainWindow = do
     -- setup about dialog
     aboutDialog <- aboutDialogNew
     set aboutDialog [aboutDialogProgramName := ("DrumGizmo Patch Maker":: Text),
-        aboutDialogVersion := ("V0.1" :: Text),
+        aboutDialogVersion := ("V0.8" :: Text),
         aboutDialogCopyright := ("(C) by Michael Oswald" :: Text),
             aboutDialogComments := ("A tool for creating patches for the drumgizmo plugin\n\n" :: Text),
         aboutDialogAuthors := [("Michael Oswald" :: Text)]

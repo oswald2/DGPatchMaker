@@ -25,9 +25,16 @@ data ChannelMap = ChannelMap {
     cmGroup :: Maybe Text,
     cmFile :: !FilePath,
     cmType :: Maybe Instrument,
-    cmMap :: [(Text, Text)],
+    cmMap :: [ChannelMapItem],
     cmContainsUndefined :: Bool
 } deriving (Show)
+
+data ChannelMapItem = ChannelMapItem {
+    cmiIn :: !Text,
+    cmiOut :: !Text,
+    cmiMain :: !Bool
+} deriving (Show)
+
 
 data MidiMap = MidiMap {
     mmNote :: [(Int, Text)]
@@ -138,7 +145,8 @@ data AudioFile = AudioFile {
     afChannel:: !Text,
     afPath :: !FilePath,
     afFileChannel :: !Word,
-    afPower :: Maybe Double
+    afPower :: Maybe Double,
+    afSampleRate :: Maybe Int
 } deriving (Show, Read, Eq)
 
 instance Ord AudioFile where
@@ -337,8 +345,17 @@ instrumentFileToChannelMap ifl =
         grp (Just t) | t == HiHat = Just "hihat"
         grp _ = Nothing
         chans' = getAvailableChannelsIF ifl S.empty
-        chans = Prelude.map (\x -> (x, x)) $ toAscList chans'
+        chans = Prelude.map (\x -> mkChannelMapItem x x Nothing) $ toAscList chans'
 
+mkChannelMapItem :: Text -> Text -> Maybe Text -> ChannelMapItem
+mkChannelMapItem inp out mn = ChannelMapItem inp out (toBool mn)
+    where
+        toBool Nothing = False 
+        toBool (Just txt) = 
+            if toUpper txt == "TRUE" then True else False 
+
+mkChannelMapItemTuple :: (Text, Text, Maybe Text) -> ChannelMapItem
+mkChannelMapItemTuple (inp, out, mn) = mkChannelMapItem inp out mn
 
 
 getAvailableChannelsIF :: InstrumentFile -> Set Text -> Set Text
@@ -408,11 +425,12 @@ cmChangeChannel :: Text -> Text -> ChannelMap -> ChannelMap
 cmChangeChannel oldName newName cm = cm {cmMap = chans }
     where
         chans = Prelude.map chg (cmMap cm)
-        chg (inC, outC) | outC == oldName = (inC, newName)
-                        | otherwise = (inC, outC)
+        chg x@(ChannelMapItem inC outC mn) 
+            | outC == oldName = ChannelMapItem inC newName mn
+            | otherwise = x
 
-cmCheckUndefined :: [(Text, Text)] -> Bool
-cmCheckUndefined = Prelude.any (== True) . Prelude.map ((== (pack (show Undefined))) . snd)
+cmCheckUndefined :: [ChannelMapItem] -> Bool
+cmCheckUndefined = Prelude.any (== True) . Prelude.map ((== (pack (show Undefined))) . cmiOut)
 
 cmUpdateIfUndefined :: ChannelMap -> ChannelMap
 cmUpdateIfUndefined cm = newCm

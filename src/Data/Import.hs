@@ -109,7 +109,7 @@ parseAudioFile = do
                     )
             else do
                 let Right (x, _) = filechannel'
-                return $ AudioFile chan (unpack file) x Nothing
+                return $ AudioFile chan (unpack file) x Nothing Nothing
 
 
 importInstrumentFile :: FilePath -> IO (Either Text InstrumentFile)
@@ -152,14 +152,12 @@ conduitDrumKitXML = do
     channels    = tagNoAttr "channels" (many ch)
     ch          = tag' "channel" (requireAttr "name") return
     instruments = tagNoAttr "instruments" (many ins)
-    ins =
-        tag'
-                "instrument"
-                ((,,) <$> requireAttr "name" <*> attr "group" <*> requireAttr
-                    "file"
-                )
+    ins = tag' "instrument" 
+            ((,,) <$> requireAttr "name" <*> attr "group" <*> requireAttr "file"
+            )
             $ \(name, group, file) -> do
-                  cm <- many channelmap
+                  cm' <- many channelmap
+                  let cm = map mkChannelMapItemTuple cm'
                   return $ ChannelMap name
                                       group
                                       (unpack file)
@@ -167,7 +165,7 @@ conduitDrumKitXML = do
                                       cm
                                       (cmCheckUndefined cm)
     channelmap = tag' "channelmap"
-                      ((,) <$> requireAttr "in" <*> requireAttr "out")
+                      ((,,) <$> requireAttr "in" <*> requireAttr "out" <*> attr "main")
                       return
 
 

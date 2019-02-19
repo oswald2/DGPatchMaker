@@ -1,39 +1,44 @@
-{-# LANGUAGE OverloadedStrings, BangPatterns, NoImplicitPrelude #-}
-module Gtk.Drumkit
-
-where
+{-# LANGUAGE OverloadedStrings, BangPatterns #-}
+module Gtk.Drumkit where
 
 
-import ClassyPrelude
+--import           ClassyPrelude
 
-import Prelude (read, head)
+import           System.FilePath.Find          as F
+import           System.FilePath
 
-import System.FilePath.Find as F
-import System.FilePath
+import           Control.Exception
+import           Control.Monad
+import           Control.Monad.IO.Class
 
-import Data.Types
-import Data.DrumDrops.Utils
-import Data.Char (isSpace)
-import Data.Export
-import Data.Drumgizmo
-import Data.Import
-import Data.Either
+import           Data.Types
+import           Data.DrumDrops.Utils
+import           Data.Char                      ( isSpace )
+import           Data.Export
+import           Data.Drumgizmo
+import           Data.Import
+import           Data.Either
+import           Data.List                     as L
+                                                ( find, sortOn )
 
 
-import qualified Data.Vector as V
-
+import           Data.Vector                    ( Vector )
+import qualified Data.Vector                   as V
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 --import Data.Text as T (pack)
---import Data.IORef
-import qualified Data.Set as S
+import           Data.IORef
+import           Data.Set                       ( Set )
+import qualified Data.Set                      as S
 
-import Graphics.UI.Gtk as G
+import           Graphics.UI.Gtk               as G
 
-import Gtk.Utils
-import Gtk.Colors
-import Gtk.InstrumentFrame
-import Gtk.ErrorDialog
-import Gtk.MidiMap
-import Gtk.FileHandlingDialog
+import           Gtk.Utils
+import           Gtk.Colors
+import           Gtk.InstrumentFrame
+import           Gtk.ErrorDialog
+import           Gtk.MidiMap
+import           Gtk.FileHandlingDialog
 
 
 data DrumkitPage = DrumkitPage {
@@ -53,7 +58,7 @@ data DrumkitPage = DrumkitPage {
     guiTvChannelMap :: TreeView,
     guiTvChannelsModel :: ListStore Text,
     guiTvInstrumentsModel :: ListStore ChannelMap,
-    guiTvChannelMapModel :: ListStore (Text, Text),
+    guiTvChannelMapModel :: ListStore ChannelMapItem,
     guiDrumkit :: IORef (Maybe Drumkit),
     guiDkInstrumentPages :: IORef (Vector InstrumentPage),
     guiErrDiag :: ErrorDialog,
@@ -71,158 +76,235 @@ data DrumkitPage = DrumkitPage {
 }
 
 
-initDrumkitPage :: Window ->
-                    G.Builder ->
-                    Notebook ->
-                    ProgressBar ->
-                    ComboBox ->
-                    Entry ->
-                    Entry ->
-                    IORef (Vector InstrumentPage) ->
-                    FileHandlingDialog ->
-                    IO DrumkitPage
-initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir ioref fhDialog = do
+initDrumkitPage
+    :: Window
+    -> G.Builder
+    -> Notebook
+    -> ProgressBar
+    -> ComboBox
+    -> Entry
+    -> Entry
+    -> IORef (Vector InstrumentPage)
+    -> FileHandlingDialog
+    -> IO DrumkitPage
+initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir ioref fhDialog
+    = do
 
-    buttonImportDrumkit <- builderGetObject builder castToButton ("buttonImportDrumkit" :: Text)
-    -- buttonExportDrumkit <- builderGetObject builder castToButton ("buttonExportDrumkit" :: Text)
-    buttonSetBaseDir <- builderGetObject builder castToButton ("buttonSetBaseDir" :: Text)
-    buttonSetSamplesDir <- builderGetObject builder castToButton ("buttonSetSamplesDir" :: Text)
-    buttonConvertToFullMix <- builderGetObject builder castToButton ("buttonConvertToFullMix" :: Text)
+        buttonImportDrumkit <- builderGetObject
+            builder
+            castToButton
+            ("buttonImportDrumkit" :: Text)
+        -- buttonExportDrumkit <- builderGetObject builder castToButton ("buttonExportDrumkit" :: Text)
+        buttonSetBaseDir <- builderGetObject builder
+                                             castToButton
+                                             ("buttonSetBaseDir" :: Text)
+        buttonSetSamplesDir <- builderGetObject
+            builder
+            castToButton
+            ("buttonSetSamplesDir" :: Text)
+        buttonConvertToFullMix <- builderGetObject
+            builder
+            castToButton
+            ("buttonConvertToFullMix" :: Text)
 
-    miLoadDrumKit <- builderGetObject builder castToMenuItem ("imagemenuitemLoadDrumkit" :: Text)
-    miExportDrumKit <- builderGetObject builder castToMenuItem ("menuitemExportDrumkit" :: Text)
-    miSaveDrumkitFile <- builderGetObject builder castToMenuItem ("imagemenuitemSaveDrumkitFile" :: Text)
-
-
-    tvChannels <- builderGetObject builder castToTreeView ("treeviewChannels" :: Text)
-    tvInstruments <- builderGetObject builder castToTreeView ("treeviewInstruments" :: Text)
-    tvChannelMap <- builderGetObject builder castToTreeView ("treeviewChannelMap" :: Text)
-
-    eName <- builderGetObject builder castToEntry ("entryDkName" :: Text)
-    eSr <- builderGetObject builder castToEntry ("entrySampleRate" :: Text)
-    eDesc <- builderGetObject builder castToTextView ("textviewDkDescription" :: Text)
-
-    tvMidiGM <- builderGetObject builder castToTreeView ("treeviewMidiMapGM" :: Text)
-    tvMidiDef <- builderGetObject builder castToTreeView ("treeviewMidiMapDef" :: Text)
-
-    lsm <- listStoreNew []
-    lsinst <- listStoreNew []
-    lscm <- listStoreNew []
-
-    errDiag <- initErrorDialog builder
-
-    dr <- newIORef Nothing
-
-    channelRenderer <- initTvChannels tvChannels lsm
-    groupRenderer <- initTvInstruments tvInstruments lsinst
-    outRenderer <- initTvChannelMap tvChannelMap lsm lscm
-
-    -- entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
-    -- entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
-
-    -- entrySetText eName ("MapexHeavyRockMultiVelocity" :: Text)
-    entrySetText entryBaseDirectory ("" :: FilePath)
-    entrySetText entrySamplesDir ("" :: FilePath)
-    entrySetText eName ("" :: Text)
-
-    gmLoadButton <- builderGetObject builder castToButton ("buttonLoadGMMap" :: Text)
-    gmExportButton <- builderGetObject builder castToButton ("buttonExportGMMap" :: Text)
-
-    defLoadButton <- builderGetObject builder castToButton ("buttonLoadDefMap" :: Text)
-    defExportButton <- builderGetObject builder castToButton ("buttonExportDefMap" :: Text)
-
-    resetButton <- builderGetObject builder castToButton ("buttonReset" :: Text)
-    compileButton <- builderGetObject builder castToButton ("buttonCompile" :: Text)
-
-    midiMapGm <- initMidiMap mainWindow tvMidiGM entryBaseDirectory gmLoadButton gmExportButton fhDialog
-    midiMapDef <- initMidiMap mainWindow tvMidiDef entryBaseDirectory defLoadButton defExportButton fhDialog
-
-    initParserCombo combo
-
-    channelMenu <- builderGetObject builder castToMenu ("menuChannels" :: Text)
-    itemAddChannel <- builderGetObject builder castToMenuItem ("menuitemAddChannel" :: Text)
-    itemRemoveChannel <- builderGetObject builder castToMenuItem ("menuitemRemoveChannel" :: Text)
-
-    channelMapMenu <- builderGetObject builder castToMenu ("menuChannelMap" :: Text)
-    itemDuplicate <- builderGetObject builder castToMenuItem ("menuitemDuplicate" :: Text)
-    itemRemoveCM <- builderGetObject builder castToMenuItem ("menuitemRemove" :: Text)
-
-    btCompileGM <- builderGetObject builder castToButton ("buttonCompileFromKitGM" :: Text)
-    btCompileDef <- builderGetObject builder castToButton ("buttonCompileFromKitDefault" :: Text)
-
-    btUp <- builderGetObject builder castToButton ("buttonUp" :: Text)
-    btDown <- builderGetObject builder castToButton ("buttonDown" :: Text)
-    btSort <- builderGetObject builder castToButton ("buttonSort" :: Text)
+        miLoadDrumKit <- builderGetObject
+            builder
+            castToMenuItem
+            ("imagemenuitemLoadDrumkit" :: Text)
+        miExportDrumKit <- builderGetObject
+            builder
+            castToMenuItem
+            ("menuitemExportDrumkit" :: Text)
+        miSaveDrumkitFile <- builderGetObject
+            builder
+            castToMenuItem
+            ("imagemenuitemSaveDrumkitFile" :: Text)
 
 
-    let gui = DrumkitPage{
-            guiDkParentWindow = mainWindow,
-            guiTvChannels = tvChannels,
-            guiTvInstruments = tvInstruments,
-            guiTvChannelMap = tvChannelMap,
-            guiTvChannelsModel = lsm,
-            guiTvInstrumentsModel = lsinst,
-            guiTvChannelMapModel = lscm,
-            guiDrumkit = dr,
-            guiDkName = eName,
-            guiDkDescription = eDesc,
-            guiDkSampleRate = eSr,
-            guiBaseDir = entryBaseDirectory,
-            guiSamplesDir = entrySamplesDir,
-            guiBtImportDrumkit = buttonImportDrumkit,
-            guiBtSetBaseDir = buttonSetBaseDir,
-            guiBtSetSamplesDir = buttonSetSamplesDir,
-            guiDkInstrumentsNotebook = instrumentsNotebook,
-            guiDkProgress = progress,
-            guiErrDiag = errDiag,
-            guiDkInstrumentPages = ioref,
-            guiMidiMapGM = midiMapGm,
-            guiMidiMapDef = midiMapDef,
-            guiParserCombo = combo,
-            guiChannelMenu = channelMenu,
-            guiChannelRenderer = channelRenderer,
-            guiFhDialog = fhDialog,
-            guiOutChannelRenderer = outRenderer,
-            guiGroupRenderer = groupRenderer,
-            guiChannelMapMenu = channelMapMenu,
-            guiBtCompileGM = btCompileGM,
-            guiBtCompileDef = btCompileDef
-        }
+        tvChannels <- builderGetObject builder
+                                       castToTreeView
+                                       ("treeviewChannels" :: Text)
+        tvInstruments <- builderGetObject builder
+                                          castToTreeView
+                                          ("treeviewInstruments" :: Text)
+        tvChannelMap <- builderGetObject builder
+                                         castToTreeView
+                                         ("treeviewChannelMap" :: Text)
 
-    setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
+        eName <- builderGetObject builder castToEntry ("entryDkName" :: Text)
+        eSr <- builderGetObject builder castToEntry ("entrySampleRate" :: Text)
+        eDesc <- builderGetObject builder
+                                  castToTextView
+                                  ("textviewDkDescription" :: Text)
 
-    void $ G.on buttonSetBaseDir buttonActivated $ setBaseDir gui
-    void $ G.on buttonSetSamplesDir buttonActivated $ setSamplesDir gui
+        tvMidiGM <- builderGetObject builder
+                                     castToTreeView
+                                     ("treeviewMidiMapGM" :: Text)
+        tvMidiDef <- builderGetObject builder
+                                      castToTreeView
+                                      ("treeviewMidiMapDef" :: Text)
 
-    void $ G.on buttonImportDrumkit buttonActivated $ importDrumDropsDrumKit gui
-    --void $ G.on buttonExportDrumkit buttonActivated $ exportDrumKit gui
-    --void $ G.on buttonLoadDrumkit buttonActivated $ loadDrumkit gui
+        lsm             <- listStoreNew []
+        lsinst          <- listStoreNew []
+        lscm            <- listStoreNew []
 
-    void $ G.on buttonConvertToFullMix buttonActivated $ convertToFullMix gui
+        errDiag         <- initErrorDialog builder
 
-    void $ G.on miLoadDrumKit menuItemActivated $ loadDrumkit gui
-    void $ G.on miExportDrumKit menuItemActivated $ exportDrumKit gui
-    void $ G.on miSaveDrumkitFile menuItemActivated $ saveDrumkit gui
+        dr              <- newIORef Nothing
 
-    void $ G.on resetButton buttonActivated $ resetDrumkit gui
-    void $ G.on compileButton buttonActivated $ compileDrumkit gui
+        channelRenderer <- initTvChannels tvChannels lsm
+        groupRenderer   <- initTvInstruments tvInstruments lsinst
+        outRenderer     <- initTvChannelMap tvChannelMap lsm lscm
 
-    void $ G.on itemAddChannel menuItemActivated $ addChannel gui
-    void $ G.on itemRemoveChannel menuItemActivated $ removeChannel gui
+        -- entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
+        -- entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
 
-    void $ G.on itemDuplicate menuItemActivated $ duplicateCM gui
-    void $ G.on itemRemoveCM menuItemActivated $ removeCM gui
+        -- entrySetText eName ("MapexHeavyRockMultiVelocity" :: Text)
+        entrySetText entryBaseDirectory ("" :: FilePath)
+        entrySetText entrySamplesDir    ("" :: FilePath)
+        entrySetText eName              ("" :: Text)
 
-    void $ G.on btCompileGM buttonActivated $ compileMidiMapGM gui
-    void $ G.on btCompileDef buttonActivated $ compileMidiMapDefault gui
+        gmLoadButton <- builderGetObject builder
+                                         castToButton
+                                         ("buttonLoadGMMap" :: Text)
+        gmExportButton <- builderGetObject builder
+                                           castToButton
+                                           ("buttonExportGMMap" :: Text)
 
-    void $ G.on btUp buttonActivated $ channelUp gui
-    void $ G.on btDown buttonActivated $ channelDown gui
-    void $ G.on btSort buttonActivated $ sortChannels gui
+        defLoadButton <- builderGetObject builder
+                                          castToButton
+                                          ("buttonLoadDefMap" :: Text)
+        defExportButton <- builderGetObject builder
+                                            castToButton
+                                            ("buttonExportDefMap" :: Text)
 
-    setupCallbacks gui
+        resetButton <- builderGetObject builder
+                                        castToButton
+                                        ("buttonReset" :: Text)
+        compileButton <- builderGetObject builder
+                                          castToButton
+                                          ("buttonCompile" :: Text)
 
-    return gui
+        midiMapGm <- initMidiMap mainWindow
+                                 tvMidiGM
+                                 entryBaseDirectory
+                                 gmLoadButton
+                                 gmExportButton
+                                 fhDialog
+        midiMapDef <- initMidiMap mainWindow
+                                  tvMidiDef
+                                  entryBaseDirectory
+                                  defLoadButton
+                                  defExportButton
+                                  fhDialog
+
+        initParserCombo combo
+
+        channelMenu <- builderGetObject builder
+                                        castToMenu
+                                        ("menuChannels" :: Text)
+        itemAddChannel <- builderGetObject builder
+                                           castToMenuItem
+                                           ("menuitemAddChannel" :: Text)
+        itemRemoveChannel <- builderGetObject
+            builder
+            castToMenuItem
+            ("menuitemRemoveChannel" :: Text)
+
+        channelMapMenu <- builderGetObject builder
+                                           castToMenu
+                                           ("menuChannelMap" :: Text)
+        itemDuplicate <- builderGetObject builder
+                                          castToMenuItem
+                                          ("menuitemDuplicate" :: Text)
+        itemRemoveCM <- builderGetObject builder
+                                         castToMenuItem
+                                         ("menuitemRemove" :: Text)
+
+        btCompileGM <- builderGetObject builder
+                                        castToButton
+                                        ("buttonCompileFromKitGM" :: Text)
+        btCompileDef <- builderGetObject
+            builder
+            castToButton
+            ("buttonCompileFromKitDefault" :: Text)
+
+        btUp   <- builderGetObject builder castToButton ("buttonUp" :: Text)
+        btDown <- builderGetObject builder castToButton ("buttonDown" :: Text)
+        btSort <- builderGetObject builder castToButton ("buttonSort" :: Text)
+
+
+        let gui = DrumkitPage
+                { guiDkParentWindow        = mainWindow
+                , guiTvChannels            = tvChannels
+                , guiTvInstruments         = tvInstruments
+                , guiTvChannelMap          = tvChannelMap
+                , guiTvChannelsModel       = lsm
+                , guiTvInstrumentsModel    = lsinst
+                , guiTvChannelMapModel     = lscm
+                , guiDrumkit               = dr
+                , guiDkName                = eName
+                , guiDkDescription         = eDesc
+                , guiDkSampleRate          = eSr
+                , guiBaseDir               = entryBaseDirectory
+                , guiSamplesDir            = entrySamplesDir
+                , guiBtImportDrumkit       = buttonImportDrumkit
+                , guiBtSetBaseDir          = buttonSetBaseDir
+                , guiBtSetSamplesDir       = buttonSetSamplesDir
+                , guiDkInstrumentsNotebook = instrumentsNotebook
+                , guiDkProgress            = progress
+                , guiErrDiag               = errDiag
+                , guiDkInstrumentPages     = ioref
+                , guiMidiMapGM             = midiMapGm
+                , guiMidiMapDef            = midiMapDef
+                , guiParserCombo           = combo
+                , guiChannelMenu           = channelMenu
+                , guiChannelRenderer       = channelRenderer
+                , guiFhDialog              = fhDialog
+                , guiOutChannelRenderer    = outRenderer
+                , guiGroupRenderer         = groupRenderer
+                , guiChannelMapMenu        = channelMapMenu
+                , guiBtCompileGM           = btCompileGM
+                , guiBtCompileDef          = btCompileDef
+                }
+
+        --setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
+        setDkDescription gui ""
+
+        void $ G.on buttonSetBaseDir buttonActivated $ setBaseDir gui
+        void $ G.on buttonSetSamplesDir buttonActivated $ setSamplesDir gui
+
+        void $ G.on buttonImportDrumkit buttonActivated $ importDrumDropsDrumKit
+            gui
+        --void $ G.on buttonExportDrumkit buttonActivated $ exportDrumKit gui
+        --void $ G.on buttonLoadDrumkit buttonActivated $ loadDrumkit gui
+
+        void $ G.on buttonConvertToFullMix buttonActivated $ convertToFullMix
+            gui
+
+        void $ G.on miLoadDrumKit menuItemActivated $ loadDrumkit gui
+        void $ G.on miExportDrumKit menuItemActivated $ exportDrumKit gui
+        void $ G.on miSaveDrumkitFile menuItemActivated $ saveDrumkit gui
+
+        void $ G.on resetButton buttonActivated $ resetDrumkit gui
+        void $ G.on compileButton buttonActivated $ compileDrumkit gui
+
+        void $ G.on itemAddChannel menuItemActivated $ addChannel gui
+        void $ G.on itemRemoveChannel menuItemActivated $ removeChannel gui
+
+        void $ G.on itemDuplicate menuItemActivated $ duplicateCM gui
+        void $ G.on itemRemoveCM menuItemActivated $ removeCM gui
+
+        void $ G.on btCompileGM buttonActivated $ compileMidiMapGM gui
+        void $ G.on btCompileDef buttonActivated $ compileMidiMapDefault gui
+
+        void $ G.on btUp buttonActivated $ channelUp gui
+        void $ G.on btDown buttonActivated $ channelDown gui
+        void $ G.on btSort buttonActivated $ sortChannels gui
+
+        setupCallbacks gui
+
+        return gui
 
 
 getDkName :: DrumkitPage -> IO Text
@@ -231,13 +313,16 @@ getDkName dkp = entryGetText (guiDkName dkp)
 
 getDkDescription :: DrumkitPage -> IO Text
 getDkDescription dkp = do
-    buffer <- textViewGetBuffer (guiDkDescription dkp)
+    buffer       <- textViewGetBuffer (guiDkDescription dkp)
     (start, end) <- textBufferGetBounds buffer
-    res <- textBufferGetText buffer start end False
-    return $ filter (/= '\n') res
+    res          <- textBufferGetText buffer start end False
+    return $ T.filter (/= '\n') res
 
 getDkSampleRate :: DrumkitPage -> IO Text
 getDkSampleRate dkp = entryGetText (guiDkSampleRate dkp)
+
+setDkSampleRate :: DrumkitPage -> Text -> IO ()
+setDkSampleRate dkp sr = entrySetText (guiDkSampleRate dkp) sr
 
 
 setDkDescription :: DrumkitPage -> Text -> IO ()
@@ -252,20 +337,20 @@ initParserCombo cb = do
     void $ comboBoxSetModelText cb
     void $ mapM (comboBoxAppendText cb) str
     comboBoxSetActive cb 0
-    where
-        str = map (pack . show) (enumFrom MapexParser)
+    where str = map (T.pack . show) (enumFrom MapexParser)
 
 setBaseDir :: DrumkitPage -> IO ()
 setBaseDir mainWindow = do
     let parentWindow = guiDkParentWindow mainWindow
     dialog <- fileChooserDialogNew
-              (Just $ ("Set Base Directory for Imports" :: Text))             --dialog title
-              (Just parentWindow)                     --the parent window
-              FileChooserActionSelectFolder                         --the kind of dialog we want
-              [("gtk-cancel"                                --The buttons to display
-               ,ResponseCancel)
-              ,("gtk-open"
-               , ResponseAccept)]
+        (Just $ ("Set Base Directory for Imports" :: Text))             --dialog title
+        (Just parentWindow)                     --the parent window
+        FileChooserActionSelectFolder                         --the kind of dialog we want
+        [ ( "gtk-cancel"                                --The buttons to display
+          , ResponseCancel
+          )
+        , ("gtk-open", ResponseAccept)
+        ]
 
     basepath <- entryGetText (guiBaseDir mainWindow)
     void $ fileChooserSetFilename dialog basepath
@@ -276,15 +361,17 @@ setBaseDir mainWindow = do
         ResponseAccept -> do
             f <- fileChooserGetFilename dialog
             case f of
-                Nothing -> return ()
+                Nothing  -> return ()
                 Just dir -> do
                     entrySetText (guiBaseDir mainWindow) dir
                     txt <- entryGetText (guiSamplesDir mainWindow)
-                    if null (txt :: Text) then entrySetText (guiSamplesDir mainWindow) dir else return ()
+                    if T.null txt
+                        then entrySetText (guiSamplesDir mainWindow) dir
+                        else return ()
                     return ()
-        ResponseCancel -> return ()
+        ResponseCancel      -> return ()
         ResponseDeleteEvent -> return ()
-        _ -> return ()
+        _                   -> return ()
     widgetHide dialog
 
 
@@ -292,13 +379,14 @@ setSamplesDir :: DrumkitPage -> IO ()
 setSamplesDir mainWindow = do
     let parentWindow = guiDkParentWindow mainWindow
     dialog <- fileChooserDialogNew
-              (Just $ ("Set Sample Base Directory for Imports" :: Text))             --dialog title
-              (Just parentWindow)                     --the parent window
-              FileChooserActionSelectFolder                         --the kind of dialog we want
-              [("gtk-cancel"                                --The buttons to display
-               ,ResponseCancel)
-              ,("gtk-open"
-               , ResponseAccept)]
+        (Just $ ("Set Sample Base Directory for Imports" :: Text))             --dialog title
+        (Just parentWindow)                     --the parent window
+        FileChooserActionSelectFolder                         --the kind of dialog we want
+        [ ( "gtk-cancel"                                --The buttons to display
+          , ResponseCancel
+          )
+        , ("gtk-open", ResponseAccept)
+        ]
     loc <- entryGetText (guiSamplesDir mainWindow)
     void $ fileChooserSetFilename dialog loc
 
@@ -308,13 +396,13 @@ setSamplesDir mainWindow = do
         ResponseAccept -> do
             f <- fileChooserGetFilename dialog
             case f of
-                Nothing -> return ()
+                Nothing  -> return ()
                 Just dir -> do
                     entrySetText (guiSamplesDir mainWindow) dir
                     return ()
-        ResponseCancel -> return ()
+        ResponseCancel      -> return ()
         ResponseDeleteEvent -> return ()
-        _ -> return ()
+        _                   -> return ()
     widgetHide dialog
 
 
@@ -322,14 +410,14 @@ setSamplesDir mainWindow = do
 setDrumkit :: DrumkitPage -> Drumkit -> IO ()
 setDrumkit gui dk = do
     writeIORef (guiDrumkit gui) (Just dk)
-    widgetSetSensitive (guiBtCompileGM gui) True
+    widgetSetSensitive (guiBtCompileGM gui)  True
     widgetSetSensitive (guiBtCompileDef gui) True
 
 
 clearDrumkit :: DrumkitPage -> IO ()
 clearDrumkit gui = do
     writeIORef (guiDrumkit gui) Nothing
-    widgetSetSensitive (guiBtCompileGM gui) False
+    widgetSetSensitive (guiBtCompileGM gui)  False
     widgetSetSensitive (guiBtCompileDef gui) False
 
 
@@ -341,8 +429,12 @@ getDrumkit gui = do
 importDrumDropsDrumKit :: DrumkitPage -> IO ()
 importDrumDropsDrumKit gui = do
     widgetSetSensitive (guiParserCombo gui) False
-    catch (importDrumDropsDrumKit' gui)
-        (\e -> displayErrorBox (guiDkParentWindow gui) ("Error: " <> pack (show (e :: SomeException))))
+    catch
+        (importDrumDropsDrumKit' gui)
+        (\e -> displayErrorBox
+            (guiDkParentWindow gui)
+            ("Error: " <> T.pack (show (e :: SomeException)))
+        )
     widgetSetSensitive (guiParserCombo gui) True
 
 
@@ -355,7 +447,7 @@ importDrumDropsDrumKit' gui = do
         basedir -> do
             samplesDir <- entryGetText (guiSamplesDir gui)
 
-            dirs <- getDirectoriesToImport samplesDir
+            dirs       <- getDirectoriesToImport samplesDir
 
             -- first clear the instruments notebook
             clearNotebook (guiDkInstrumentsNotebook gui)
@@ -365,17 +457,26 @@ importDrumDropsDrumKit' gui = do
             let errs = lefts instFiles
             case null errs of
                 False -> do
-                    displayMultiErrors (guiErrDiag gui) "Multiple errors happened during Import of Instruments:" errs
+                    displayMultiErrors
+                        (guiErrDiag gui)
+                        "Multiple errors happened during Import of Instruments:"
+                        errs
                     return ()
                 True -> do
                     let insts :: [(InstrumentFile, Int)]
-                        insts = rights instFiles
-                        sampleRate = if null insts then 44100 else let (_, sr) = Prelude.head insts in sr
+                        insts      = rights instFiles
+                        sampleRate = if null insts
+                            then 44100
+                            else let (_, sr) = Prelude.head insts in sr
                         --sampleRate = 44100
-                    nm <- getDkName gui
+                    nm   <- getDkName gui
                     desc <- getDkDescription gui
 
-                    let drumkit = generateDrumkit nm desc (Just (pack (show sampleRate))) (map fst insts)
+                    let drumkit = generateDrumkit
+                            nm
+                            desc
+                            (Just (T.pack (show sampleRate)))
+                            (map fst insts)
 
                     -- set the actual drumkit
                     setDrumkit gui drumkit
@@ -387,58 +488,72 @@ importDrumDropsDrumKit' gui = do
                     -- also convert the drumkit to a midi map
                     let midimap = getMidiMap drumkit
 
-                    setMidiMap (guiMidiMapGM gui) midimap
+                    setMidiMap (guiMidiMapGM gui)  midimap
                     setMidiMap (guiMidiMapDef gui) midimap
 
                     return ()
             return ()
-    where
-        doImport :: FilePath -> FilePath -> [FilePath] -> IO [Either Text (InstrumentFile, Int)]
-        doImport basedir samplesDir paths = do
-            -- import the instruments
-            let progress = guiDkProgress gui
-                n = length paths
-                step :: Double
-                step = 1.0 / fromIntegral n
-            progressBarSetText progress ("Importing DrumDrops Drumkit..." :: Text)
+  where
+    doImport
+        :: FilePath
+        -> FilePath
+        -> [FilePath]
+        -> IO [Either Text (InstrumentFile, Int)]
+    doImport basedir samplesDir paths = do
+        -- import the instruments
+        let progress = guiDkProgress gui
+            n        = length paths
+            step :: Double
+            step = 1.0 / fromIntegral n
+        progressBarSetText progress ("Importing DrumDrops Drumkit..." :: Text)
 
-            instruments <- forM paths (doSingleImport progress basedir samplesDir step)
+        instruments <- forM
+            paths
+            (doSingleImport progress basedir samplesDir step)
 
-            progressBarSetText progress ("" :: Text)
-            progressBarSetFraction progress 0.0
+        progressBarSetText progress ("" :: Text)
+        progressBarSetFraction progress 0.0
 
-            return instruments
+        return instruments
 
-        doSingleImport progress basedir samplesDir step path = do
-            ins <- instrumentPageNew (guiDkParentWindow gui) (guiDkInstrumentsNotebook gui)
-                (guiBaseDir gui) (guiSamplesDir gui) (guiParserCombo gui) (guiDkInstrumentPages gui) (guiFhDialog gui) (guiErrDiag gui)
-            let instName = pathToInstrument samplesDir path
-            _ <- notebookAppendPage (guiDkInstrumentsNotebook gui) (instrumentPageGetMainBox ins) instName
-            instrumentPageInsert ins
+    doSingleImport progress basedir samplesDir step path = do
+        ins <- instrumentPageNew (guiDkParentWindow gui)
+                                 (guiDkInstrumentsNotebook gui)
+                                 (guiBaseDir gui)
+                                 (guiSamplesDir gui)
+                                 (guiParserCombo gui)
+                                 (guiDkInstrumentPages gui)
+                                 (guiFhDialog gui)
+                                 (guiErrDiag gui)
+        let instName = pathToInstrument samplesDir path
+        _ <- notebookAppendPage (guiDkInstrumentsNotebook gui)
+                                (instrumentPageGetMainBox ins)
+                                instName
+        instrumentPageInsert ins
 
-            pt <- comboBoxGetActiveText (guiParserCombo gui)
-            let parserType = maybe MapexParser (read . unpack) pt
+        pt <- comboBoxGetActiveText (guiParserCombo gui)
+        let parserType = maybe MapexParser (read . T.unpack) pt
 
-            res <- importInstrument parserType basedir samplesDir path
-            case res of
-                Left err -> do
-                    displayErrorBox (guiDkParentWindow gui) err
-                    return (Left err)
-                Right r@(instFile, _sampleRate) -> do
-                    instrumentPageSetInstrumentFile ins instFile
+        res <- importInstrument parserType basedir samplesDir path
+        case res of
+            Left err -> do
+                displayErrorBox (guiDkParentWindow gui) err
+                return (Left err)
+            Right r@(instFile, _sampleRate) -> do
+                instrumentPageSetInstrumentFile ins instFile
 
-                    -- update the progress bar
-                    frac <- progressBarGetFraction progress
-                    progressBarSetFraction progress (frac + step)
+                -- update the progress bar
+                frac <- progressBarGetFraction progress
+                progressBarSetFraction progress (frac + step)
 
-                    yield
-
-                    return (Right r)
-        yield = do
-            i <- eventsPending
-            when (i > 0) $ do
-                void $ mainIteration
                 yield
+
+                return (Right r)
+    yield = do
+        i <- eventsPending
+        when (i > 0) $ do
+            void $ mainIteration
+            yield
 
 
 
@@ -449,9 +564,9 @@ getDirectoriesToImport path = do
     let s :: Set FilePath
         s = S.fromList $ map takeDirectory dirs
     return (S.toList s)
-    where
-        recP = always
-        filterP = extension ==? ".wav"
+  where
+    recP    = always
+    filterP = extension ==? ".wav"
 
 
 initTvChannels :: TreeView -> ListStore Text -> IO (CellRendererText)
@@ -469,21 +584,23 @@ initTvChannels tv ls = do
 
     cellLayoutPackStart col1 renderer1 True
 
-    set renderer1 [cellTextEditable := True,
-                    cellTextEditableSet := True,
-                    cellTextBackgroundColor := paleYellow,
-                    cellTextBackgroundSet := True
-                    ]
+    set
+        renderer1
+        [ cellTextEditable := True
+        , cellTextEditableSet := True
+        , cellTextBackgroundColor := paleYellow
+        , cellTextBackgroundSet := True
+        ]
 
-    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [ cellText := hs]
+    cellLayoutSetAttributes col1 renderer1 ls $ \hs -> [cellText := hs]
 
     _ <- treeViewAppendColumn tv col1
 
     treeViewSetEnableSearch tv True
     treeViewSetSearchEqualFunc tv $ Just $ \str iter -> do
-        (i:_) <- treeModelGetPath ls iter
-        row <- listStoreGetValue ls i
-        return $ toLower str `isPrefixOf` toLower (show row)
+        (i : _) <- treeModelGetPath ls iter
+        row     <- listStoreGetValue ls i
+        return $ T.toLower str `T.isPrefixOf` T.toLower (T.pack (show row))
 
     return (renderer1)
 
@@ -511,22 +628,27 @@ initTvInstruments tv ls = do
     renderer2 <- cellRendererTextNew
     renderer3 <- cellRendererTextNew
 
-    set renderer2 [cellTextEditable := True,
-                    cellTextEditableSet := True]
+    set renderer2 [cellTextEditable := True, cellTextEditableSet := True]
 
     cellLayoutPackStart col1 renderer1 True
     cellLayoutPackStart col2 renderer2 True
     cellLayoutPackStart col3 renderer3 True
 
-    cellLayoutSetAttributes col1 renderer1 ls $ \cm -> [ cellText := cmName cm,
-            cellTextBackgroundColor := yellow,
-            cellTextBackgroundSet := cmContainsUndefined cm]
-    cellLayoutSetAttributes col2 renderer2 ls $ \cm -> [ cellText := maybe "--" id (cmGroup cm),
-            cellTextBackgroundColor := yellow,
-            cellTextBackgroundSet := cmContainsUndefined cm]
-    cellLayoutSetAttributes col3 renderer3 ls $ \cm -> [ cellText := cmFile cm,
-            cellTextBackgroundColor := yellow,
-            cellTextBackgroundSet := cmContainsUndefined cm]
+    cellLayoutSetAttributes col1 renderer1 ls $ \cm ->
+        [ cellText := cmName cm
+        , cellTextBackgroundColor := yellow
+        , cellTextBackgroundSet := cmContainsUndefined cm
+        ]
+    cellLayoutSetAttributes col2 renderer2 ls $ \cm ->
+        [ cellText := maybe "--" id (cmGroup cm)
+        , cellTextBackgroundColor := yellow
+        , cellTextBackgroundSet := cmContainsUndefined cm
+        ]
+    cellLayoutSetAttributes col3 renderer3 ls $ \cm ->
+        [ cellText := cmFile cm
+        , cellTextBackgroundColor := yellow
+        , cellTextBackgroundSet := cmContainsUndefined cm
+        ]
 
 
     _ <- treeViewAppendColumn tv col1
@@ -535,9 +657,9 @@ initTvInstruments tv ls = do
 
     treeViewSetEnableSearch tv True
     treeViewSetSearchEqualFunc tv $ Just $ \str iter -> do
-        (i:_) <- treeModelGetPath ls iter
-        row <- listStoreGetValue ls i
-        return $ toLower str `isPrefixOf` toLower (cmName row)
+        (i : _) <- treeModelGetPath ls iter
+        row     <- listStoreGetValue ls i
+        return $ T.toLower str `T.isPrefixOf` T.toLower (cmName row)
 
     return (renderer2)
 
@@ -545,7 +667,11 @@ setInstruments :: DrumkitPage -> [ChannelMap] -> IO ()
 setInstruments gui insts = setListStoreTo (guiTvInstrumentsModel gui) insts
 
 
-initTvChannelMap :: TreeView -> ListStore Text -> ListStore (Text, Text) -> IO (CellRendererCombo)
+initTvChannelMap
+    :: TreeView
+    -> ListStore Text
+    -> ListStore ChannelMapItem
+    -> IO (CellRendererCombo)
 initTvChannelMap tv lsMicros ls = do
     treeViewSetModel tv (Just ls)
 
@@ -554,60 +680,74 @@ initTvChannelMap tv lsMicros ls = do
     -- add a couple columns
     col1 <- treeViewColumnNew
     col2 <- treeViewColumnNew
+    col3 <- treeViewColumnNew
 
     treeViewColumnSetTitle col1 ("In" :: Text)
     treeViewColumnSetTitle col2 ("Out" :: Text)
+    treeViewColumnSetTitle col3 ("Main" :: Text)
 
     renderer1 <- cellRendererTextNew
     renderer2 <- cellRendererComboNew
+    renderer3 <- cellRendererToggleNew
+
+    void $ on renderer3 cellToggled $ \str -> do
+        let (i : _) = stringToTreePath str
+        val <- listStoreGetValue ls i
+        listStoreSetValue ls i (val { cmiMain = not (cmiMain val) })
 
     let colId :: ColumnId Text Text
         colId = makeColumnIdString 0
         -- in this case we take the outputs liststore
 
     outChans <- listStoreToList lsMicros
-    lsChans <- listStoreNew outChans
+    lsChans  <- listStoreNew outChans
 
     treeModelSetColumn lsChans colId id
 
     cellLayoutPackStart col1 renderer1 True
     cellLayoutPackStart col2 renderer2 True
+    cellLayoutPackStart col3 renderer3 True
 
-    set renderer2 [ cellTextEditable := True,
-                    cellTextEditableSet := True,
-                    cellTextBackgroundColor := paleYellow,
-                    cellTextBackgroundSet := True,
+    set
+        renderer2
+        [ cellTextEditable := True
+        , cellTextEditableSet := True
+        , cellTextBackgroundColor := paleYellow
+        , cellTextBackgroundSet := True
+        , cellComboTextModel := (lsChans, colId)
+        ]
 
-                    cellComboTextModel := (lsChans, colId)
-                    ]
-
-    cellLayoutSetAttributes col1 renderer1 ls $ \(i, _) -> [ cellText := i]
-    cellLayoutSetAttributes col2 renderer2 ls $ \(_, o) -> [ cellText := o, cellComboTextModel := (lsChans, colId)]
+    cellLayoutSetAttributes col1 renderer1 ls $ \i -> [cellText := cmiIn i]
+    cellLayoutSetAttributes col2 renderer2 ls $ \i ->
+        [cellText := cmiOut i, cellComboTextModel := (lsChans, colId)]
+    cellLayoutSetAttributes col3 renderer3 ls
+        $ \i -> [cellToggleActive := cmiMain i]
 
     _ <- treeViewAppendColumn tv col1
     _ <- treeViewAppendColumn tv col2
+    _ <- treeViewAppendColumn tv col3
 
     treeViewSetEnableSearch tv True
     treeViewSetSearchEqualFunc tv $ Just $ \str iter -> do
-        (i:_) <- treeModelGetPath ls iter
-        (x, _) <- listStoreGetValue ls i
-        return $ toLower str `isPrefixOf` toLower x
+        (i : _)              <- treeModelGetPath ls iter
+        ChannelMapItem x _ _ <- listStoreGetValue ls i
+        return $ T.toLower str `T.isPrefixOf` T.toLower x
 
     return (renderer2)
 
 
 
-setChannelMap :: DrumkitPage -> [(Text, Text)] -> IO ()
+setChannelMap :: DrumkitPage -> [ChannelMapItem] -> IO ()
 setChannelMap gui cmap = setListStoreTo (guiTvChannelMapModel gui) cmap
 
 
 
 setupCallbacks :: DrumkitPage -> IO ()
 setupCallbacks gui = do
-    let instView = guiTvInstruments gui
+    let instView      = guiTvInstruments gui
         instViewModel = guiTvInstrumentsModel gui
 
-    void $ G.on instView rowActivated $ \(i:_) _ -> do
+    void $ G.on instView rowActivated $ \(i : _) _ -> do
         !row <- listStoreGetValue instViewModel i
         setChannelMap gui (cmMap row)
 
@@ -615,9 +755,11 @@ setupCallbacks gui = do
 
     void $ G.on (guiDkName gui) entryActivated $ do
         nm <- getDkName gui
-        if (any isSpace nm)
+        if (T.any isSpace nm)
             then do
-                displayErrorBox (guiDkParentWindow gui) "Drumkit name is not allowed to contain spaces"
+                displayErrorBox
+                    (guiDkParentWindow gui)
+                    "Drumkit name is not allowed to contain spaces"
                 return ()
             else return ()
 
@@ -631,52 +773,66 @@ setupCallbacks gui = do
             _ -> return False
 
     -- edit call back for editing the channels
-    void $ G.on (guiChannelRenderer gui) edited $ \[i] str -> do
-        oldVal <- listStoreGetValue (guiTvChannelsModel gui) i
-        -- set the GTK list store to the new value
-        listStoreSetValue (guiTvChannelsModel gui) i str
-        -- now loop over every channel map and update it with the new microphone
-        mapInsts gui (cmChangeChannel oldVal str)
-        -- clear the channel map view, so the user has to reactivate it
-        listStoreClear (guiTvChannelMapModel gui)
+    void
+        $ G.on (guiChannelRenderer gui) edited
+        $ \[i] str -> do
+              oldVal <- listStoreGetValue (guiTvChannelsModel gui) i
+              -- set the GTK list store to the new value
+              listStoreSetValue (guiTvChannelsModel gui) i str
+              -- now loop over every channel map and update it with the new microphone
+              mapInsts gui (cmChangeChannel oldVal str)
+              -- clear the channel map view, so the user has to reactivate it
+              listStoreClear (guiTvChannelMapModel gui)
 
     -- callback for setting up the combo box renderer used for setting the out channel
     -- Unfortunately this is necessary for GTK3 as it otherwise doesn't work
-    void $ G.on (guiOutChannelRenderer gui) editingStarted $ \widget treepath -> do
-        case treepath of
-            [_] -> do
-                comboListStore <- comboBoxSetModelText (castToComboBox widget)
-                outChans <- listStoreToList (guiTvChannelsModel gui)
-                void $ mapM (listStoreAppend comboListStore) (outChans :: [Text])
-                return ()
-            _ -> return ()
+    void
+        $ G.on (guiOutChannelRenderer gui) editingStarted
+        $ \widget treepath -> do
+              case treepath of
+                  [_] -> do
+                      comboListStore <- comboBoxSetModelText
+                          (castToComboBox widget)
+                      outChans <- listStoreToList (guiTvChannelsModel gui)
+                      void $ mapM (listStoreAppend comboListStore)
+                                  (outChans :: [Text])
+                      return ()
+                  _ -> return ()
 
     -- callback for editing the channel
-    void $ G.on (guiOutChannelRenderer gui) edited $ \[i] str -> do
-        (inc, _) <- listStoreGetValue (guiTvChannelMapModel gui) i
-        -- set the GTK list store to the new value
-        let val' = (inc, str)
-        listStoreSetValue (guiTvChannelMapModel gui) i val'
-        -- we also need to set the new value in the instrument itself
+    void
+        $ G.on (guiOutChannelRenderer gui) edited
+        $ \[i] str -> do
+              ChannelMapItem inc _ mn <- listStoreGetValue
+                  (guiTvChannelMapModel gui)
+                  i
+              -- set the GTK list store to the new value
+              let val' = ChannelMapItem inc str mn
+              listStoreSetValue (guiTvChannelMapModel gui) i val'
+              -- we also need to set the new value in the instrument itself
 
-        sel <- treeViewGetSelection (guiTvInstruments gui)
-        path <- treeSelectionGetSelectedRows sel
-        case path of
-            ((idx:_) : _) -> do
-                hsVal <- listStoreGetValue (guiTvInstrumentsModel gui) idx
-                let cm = cmMap hsVal
-                    cm' = zipWith upd cm [0..]
-                    upd s j = if j == i then val' else s
-                    hsVal' = hsVal {cmMap = cm'}
-                listStoreSetValue (guiTvInstrumentsModel gui) idx hsVal'
-            _ -> return ()
+              sel  <- treeViewGetSelection (guiTvInstruments gui)
+              path <- treeSelectionGetSelectedRows sel
+              case path of
+                  ((idx : _) : _) -> do
+                      hsVal <- listStoreGetValue (guiTvInstrumentsModel gui) idx
+                      let cm  = cmMap hsVal
+                          cm' = zipWith upd cm [0 ..]
+                          upd s j = if j == i then val' else s
+                          hsVal' = hsVal { cmMap = cm' }
+                      listStoreSetValue (guiTvInstrumentsModel gui) idx hsVal'
+                  _ -> return ()
 
     -- edit call back for editing the channels
-    void $ G.on (guiGroupRenderer gui) edited $ \[i] str -> do
-        oldVal <- listStoreGetValue (guiTvInstrumentsModel gui) i
-        -- set the GTK list store to the new value
-        let newVal = if str == "" || str == "--" then oldVal {cmGroup = Nothing} else oldVal {cmGroup = Just str}
-        listStoreSetValue (guiTvInstrumentsModel gui) i newVal
+    void
+        $ G.on (guiGroupRenderer gui) edited
+        $ \[i] str -> do
+              oldVal <- listStoreGetValue (guiTvInstrumentsModel gui) i
+              -- set the GTK list store to the new value
+              let newVal = if str == "" || str == "--"
+                      then oldVal { cmGroup = Nothing }
+                      else oldVal { cmGroup = Just str }
+              listStoreSetValue (guiTvInstrumentsModel gui) i newVal
 
     -- right click on the channel view shows the popup for add/remove
     void $ G.on (guiTvChannelMap gui) buttonPressEvent $ do
@@ -701,13 +857,15 @@ exportDrumKit :: DrumkitPage -> IO ()
 exportDrumKit gui = do
     basepath <- entryGetText (guiBaseDir gui)
     case null basepath of
-        True -> displayErrorBox (guiDkParentWindow gui) "No basepath specified!"
+        True ->
+            displayErrorBox (guiDkParentWindow gui) "No basepath specified!"
         False -> do
             nm <- getDkName gui
-            case null nm of
-                True -> displayErrorBox (guiDkParentWindow gui) "No drumkit name specified!"
+            case T.null nm of
+                True -> displayErrorBox (guiDkParentWindow gui)
+                                        "No drumkit name specified!"
                 False -> withFileHandlingDialog (guiFhDialog gui) $ do
-                            writeDrumKitFile gui nm basepath
+                    writeDrumKitFile gui nm basepath
                             -- get the midi map and write it
                             --gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
                             --defMidi <- getMidiMapFromGUI (guiMidiMapDef gui)
@@ -719,37 +877,49 @@ exportDrumKit gui = do
 
 writeDrumKitFile :: DrumkitPage -> Text -> FilePath -> IO ()
 writeDrumKitFile gui nm basepath = do
-    catch (writeDrumKitFile' gui nm basepath)
-        (\e -> displayErrorBox (guiDkParentWindow gui) ("Error during export: " <> pack (show (e :: SomeException))))
+    catch
+        (writeDrumKitFile' gui nm basepath)
+        (\e -> displayErrorBox
+            (guiDkParentWindow gui)
+            ("Error during export: " <> T.pack (show (e :: SomeException)))
+        )
 
 
 writeDrumKitFile' :: DrumkitPage -> Text -> FilePath -> IO ()
 writeDrumKitFile' gui nm basepath = do
     dir <- createDrumgizmoDirectories basepath
     case dir of
-        Left err -> displayErrorBox (guiDkParentWindow gui) ("Error during export: " <> err)
+        Left err -> displayErrorBox (guiDkParentWindow gui)
+                                    ("Error during export: " <> err)
         Right () -> do
-            desc <- getDkDescription gui
+            desc    <- getDkDescription gui
 
             -- read the drumkit from the IORef
             drumkit <- getDrumkit gui
 
             case drumkit of
                 Nothing -> return ()
-                Just d -> do
+                Just d  -> do
                     channels <- listStoreToList (guiTvChannelsModel gui)
-                    insts <- listStoreToList (guiTvInstrumentsModel gui)
-                    basedir <- entryGetText (guiBaseDir gui)
-                    let d' = d {dkName = nm, dkDescription = desc, dkChannels = channels, dkInstruments = insts}
-                        dgPath = getDrumgizmoDir basedir
-                        drumkitFName = dgPath </> unpack nm <.> ".xml"
+                    insts    <- listStoreToList (guiTvInstrumentsModel gui)
+                    basedir  <- entryGetText (guiBaseDir gui)
+                    let d' = d { dkName        = nm
+                               , dkDescription = desc
+                               , dkChannels    = channels
+                               , dkInstruments = insts
+                               }
+                        dgPath       = getDrumgizmoDir basedir
+                        drumkitFName = dgPath </> T.unpack nm <.> ".xml"
 
                     setDrumkit gui d'
 
-                    res <- askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
+                    res <-
+                        askUserForOverwriteIfNecessary (guiFhDialog gui)
+                                                       drumkitFName
+                            $ writeDrumKitXML d' drumkitFName
                     case res of
-                        Left err -> displayErrorBox (guiDkParentWindow gui) err
-                        Right _ -> do
+                        Left  err -> displayErrorBox (guiDkParentWindow gui) err
+                        Right _   -> do
                             -- also export the instrument files
                             exportInstruments gui
 
@@ -758,18 +928,19 @@ writeDrumKitFile' gui nm basepath = do
 saveDrumkit :: DrumkitPage -> IO ()
 saveDrumkit gui = do
     basepath <- entryGetText (guiBaseDir gui)
-    nm <- unpack <$> getDkName gui
+    nm       <- T.unpack <$> getDkName gui
 
     let parentWindow = guiDkParentWindow gui
 
     dialog <- fileChooserDialogNew
-                (Just $ ("Save Drumkit File" :: Text))             --dialog title
-                (Just parentWindow)                     --the parent window
-                FileChooserActionSave                         --the kind of dialog we want
-                [("gtk-cancel"                                --The buttons to display
-                 ,ResponseCancel)
-                 ,("gtk-save"
-                 , ResponseAccept)]
+        (Just $ ("Save Drumkit File" :: Text))             --dialog title
+        (Just parentWindow)                     --the parent window
+        FileChooserActionSave                         --the kind of dialog we want
+        [ ( "gtk-cancel"                                --The buttons to display
+          , ResponseCancel
+          )
+        , ("gtk-save", ResponseAccept)
+        ]
 
     void $ fileChooserSetCurrentFolder dialog (getDrumgizmoDir basepath)
     void $ fileChooserSetCurrentName dialog nm
@@ -780,7 +951,7 @@ saveDrumkit gui = do
     case resp of
         ResponseAccept -> do
             nam <- fileChooserGetFilename dialog
-            bp <- fileChooserGetCurrentFolder dialog
+            bp  <- fileChooserGetCurrentFolder dialog
 
             case (nam, bp) of
                 (Just name, Just dir) -> do
@@ -788,18 +959,34 @@ saveDrumkit gui = do
                         drumkit <- getDrumkit gui
                         case drumkit of
                             Nothing -> return ()
-                            Just d -> do
-                                channels <- listStoreToList (guiTvChannelsModel gui)
-                                insts <- listStoreToList (guiTvInstrumentsModel gui)
+                            Just d  -> do
+                                channels <- listStoreToList
+                                    (guiTvChannelsModel gui)
+                                insts <- listStoreToList
+                                    (guiTvInstrumentsModel gui)
                                 desc <- getDkDescription gui
-                                let d' = d {dkName = (pack nm), dkDescription = desc, dkChannels = channels, dkInstruments = insts}
+                                let d' = d { dkName        = (T.pack nm)
+                                           , dkDescription = desc
+                                           , dkChannels    = channels
+                                           , dkInstruments = insts
+                                           }
                                     drumkitFName' = dir </> name
-                                    drumkitFName = if takeExtension drumkitFName' == ".xml" then drumkitFName' else addExtension drumkitFName' ".xml"
+                                    drumkitFName =
+                                        if takeExtension drumkitFName' == ".xml"
+                                            then drumkitFName'
+                                            else addExtension drumkitFName'
+                                                              ".xml"
                                 setDrumkit gui d'
 
-                                res <- askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName $ writeDrumKitXML d' drumkitFName
+                                res <-
+                                    askUserForOverwriteIfNecessary
+                                            (guiFhDialog gui)
+                                            drumkitFName
+                                        $ writeDrumKitXML d' drumkitFName
                                 case res of
-                                    Left err -> displayErrorBox (guiDkParentWindow gui) err
+                                    Left err -> displayErrorBox
+                                        (guiDkParentWindow gui)
+                                        err
                                     Right _ -> return ()
                 _ -> return ()
         _ -> return ()
@@ -809,16 +996,20 @@ saveDrumkit gui = do
 
 exportInstruments :: DrumkitPage -> IO ()
 exportInstruments gui = do
-    v <- readIORef (guiDkInstrumentPages gui)
+    v    <- readIORef (guiDkInstrumentPages gui)
     vres <- V.forM v instrumentPageWriteInstrumentFile
 
     if V.any isLeft vres
         then do
             let errs' = V.filter isLeft vres
-                errs = lefts $ V.toList errs'
-            displayMultiErrors (guiErrDiag gui) "Multiple Errors during export of Instrument Files:" errs
+                errs  = lefts $ V.toList errs'
+            displayMultiErrors
+                (guiErrDiag gui)
+                "Multiple Errors during export of Instrument Files:"
+                errs
         else do
-            displayInfoBox (guiDkParentWindow gui) "Successfully exported drumkit."
+            displayInfoBox (guiDkParentWindow gui)
+                           "Successfully exported drumkit."
 
 
 
@@ -832,7 +1023,7 @@ resetDrumkit gui = do
 
     v <- readIORef (guiDkInstrumentPages gui)
     V.mapM_ instrumentPageReset v
-    writeIORef (guiDkInstrumentPages gui) empty
+    writeIORef (guiDkInstrumentPages gui) V.empty
 
     resetMidiMap (guiMidiMapGM gui)
     resetMidiMap (guiMidiMapDef gui)
@@ -842,22 +1033,25 @@ resetDrumkit gui = do
 
 compileDrumkit :: DrumkitPage -> IO ()
 compileDrumkit gui = do
-    inst <- readIORef (guiDkInstrumentPages gui)
+    inst  <- readIORef (guiDkInstrumentPages gui)
 
     instF <- V.mapM instrumentPageGetInstrumentFile inst
 
     let errs = lefts (V.toList instF)
     if not (null errs)
         then do
-            displayMultiErrors (guiErrDiag gui) "Multiple errors happened during Import of Instruments:" errs
+            displayMultiErrors
+                (guiErrDiag gui)
+                "Multiple errors happened during Import of Instruments:"
+                errs
             return ()
         else do
-            nm <- getDkName gui
+            nm   <- getDkName gui
             desc <- getDkDescription gui
-            sr <- getDkSampleRate gui
+            sr   <- getDkSampleRate gui
 
             let drumkit = generateDrumkit nm desc (Just sr) insts
-                insts = rights (V.toList instF)
+                insts   = rights (V.toList instF)
 
             -- set the actual drumkit
             setDrumkit gui drumkit
@@ -869,13 +1063,13 @@ compileDrumkit gui = do
             -- also convert the drumkit to a midi map
             let midimap = getMidiMap drumkit
 
-            setMidiMap (guiMidiMapGM gui) midimap
+            setMidiMap (guiMidiMapGM gui)  midimap
             setMidiMap (guiMidiMapDef gui) midimap
 
 
 addChannel :: DrumkitPage -> IO ()
 addChannel gui = do
-    let def = pack (showMic Undefined)
+    let def = T.pack (showMic Undefined)
     idx <- listStoreAppend (guiTvChannelsModel gui) def
     treeViewSetCursor (guiTvChannels gui) [idx] Nothing
     activateRow (guiTvChannels gui) idx
@@ -883,13 +1077,13 @@ addChannel gui = do
 
 removeChannel :: DrumkitPage -> IO ()
 removeChannel gui = do
-    sel <- treeViewGetSelection (guiTvChannels gui)
+    sel  <- treeViewGetSelection (guiTvChannels gui)
     path <- treeSelectionGetSelectedRows sel
     case path of
-        ((idx:_) : _) -> do
+        ((idx : _) : _) -> do
             chan <- listStoreGetValue (guiTvChannelsModel gui) idx
             listStoreRemove (guiTvChannelsModel gui) idx
-            let def = pack (showMic Undefined)
+            let def = T.pack (showMic Undefined)
                 val = chan
             -- now loop over every channel map and update it with the new microphone
             mapInsts gui (cmChangeChannel val def)
@@ -909,12 +1103,12 @@ addUndefinedIfNeeded gui = do
     let undef = filter cmAnyUndefined insts
     when (not (null undef)) $ do
         ls <- listStoreToList (guiTvChannelsModel gui)
-        let def = pack (showMic Undefined)
-        case ClassyPrelude.find (== def) ls of
+        let def = T.pack (showMic Undefined)
+        case L.find (== def) ls of
             Nothing -> addChannel gui  -- if we don't find Undefined and we need it
                                        -- because there are undefined channel mappings
                                        -- we have to re-add it
-            Just _ -> return ()
+            Just _  -> return ()
 
 
 
@@ -922,13 +1116,14 @@ loadDrumkit :: DrumkitPage -> IO ()
 loadDrumkit gui = do
     let parentWindow = guiDkParentWindow gui
     dialog <- fileChooserDialogNew
-              (Just $ ("Load a Drumkit" :: Text))             --dialog title
-              (Just parentWindow)                     --the parent window
-              FileChooserActionOpen                         --the kind of dialog we want
-              [("gtk-cancel"                                --The buttons to display
-               ,ResponseCancel)
-              ,("gtk-open"
-               , ResponseAccept)]
+        (Just $ ("Load a Drumkit" :: Text))             --dialog title
+        (Just parentWindow)                     --the parent window
+        FileChooserActionOpen                         --the kind of dialog we want
+        [ ( "gtk-cancel"                                --The buttons to display
+          , ResponseCancel
+          )
+        , ("gtk-open", ResponseAccept)
+        ]
 
     widgetShow dialog
     resp <- dialogRun dialog
@@ -936,7 +1131,7 @@ loadDrumkit gui = do
         ResponseAccept -> do
             f <- fileChooserGetFilename dialog
             case f of
-                Nothing -> return ()
+                Nothing   -> return ()
                 Just file -> do
                     loadDrumkit' gui file
                     return ()
@@ -948,49 +1143,60 @@ loadDrumkit' :: DrumkitPage -> FilePath -> IO ()
 loadDrumkit' gui file = do
     res <- importDrumkitFile file
     case res of
-        Left err -> displayErrorBox (guiDkParentWindow gui) ("Error on loading drumkit: " <> err)
+        Left err -> displayErrorBox (guiDkParentWindow gui)
+                                    ("Error on loading drumkit: " <> err)
         Right dk -> do
             resetDrumkit gui
 
             let basepath = getBasePath file
                 basepathT :: Text
-                basepathT = pack basepath
-            entrySetText (guiBaseDir gui) basepathT
+                basepathT = T.pack basepath
+            entrySetText (guiBaseDir gui)    basepathT
             entrySetText (guiSamplesDir gui) basepathT
 
-            entrySetText (guiDkName gui) (dkName dk)
-            setDkDescription gui (dkDescription dk)
-
-            -- set the actual drumkit
-            setDrumkit gui dk
-
-            -- set the channels for viewing
-            setChannels gui (dkChannels dk)
-            setInstruments gui (dkInstruments dk)
+            showDrumkit gui dk
 
             -- now load the instrument files
             loadInstrumentFiles gui (takeDirectory file) (dkInstruments dk)
             return ()
 
+showDrumkit :: DrumkitPage -> Drumkit -> IO ()
+showDrumkit gui dk = do
+    entrySetText (guiDkName gui)     (dkName dk)
+    setDkDescription gui (dkDescription dk)
+    case dkSampleRate dk of
+        Just sr -> setDkSampleRate gui sr
+        Nothing -> return ()
+
+    -- set the actual drumkit
+    setDrumkit gui  dk
+
+    -- set the channels for viewing
+    setChannels gui (dkChannels dk)
+    setInstruments gui (dkInstruments dk)
+
+
 
 loadInstrumentFiles :: DrumkitPage -> FilePath -> [ChannelMap] -> IO ()
 loadInstrumentFiles gui path files = do
     mapM_ loadFile files
-    where
-        loadFile cm = do
-            let name = cmName cm
-            ins <- instrumentPageNew (guiDkParentWindow gui)
-                    (guiDkInstrumentsNotebook gui)
-                    (guiBaseDir gui)
-                    (guiSamplesDir gui)
-                    (guiParserCombo gui)
-                    (guiDkInstrumentPages gui)
-                    (guiFhDialog gui)
-                    (guiErrDiag gui)
-            void $ notebookAppendPage (guiDkInstrumentsNotebook gui) (instrumentPageGetMainBox ins) name
-            instrumentPageInsert ins
-            instrumentPageSetInstrumentName ins name
-            instrumentPageLoadFile ins (path </> (cmFile cm))
+  where
+    loadFile cm = do
+        let name = cmName cm
+        ins <- instrumentPageNew (guiDkParentWindow gui)
+                                 (guiDkInstrumentsNotebook gui)
+                                 (guiBaseDir gui)
+                                 (guiSamplesDir gui)
+                                 (guiParserCombo gui)
+                                 (guiDkInstrumentPages gui)
+                                 (guiFhDialog gui)
+                                 (guiErrDiag gui)
+        void $ notebookAppendPage (guiDkInstrumentsNotebook gui)
+                                  (instrumentPageGetMainBox ins)
+                                  name
+        instrumentPageInsert ins
+        instrumentPageSetInstrumentName ins name
+        instrumentPageLoadFile ins (path </> (cmFile cm))
 
 
 -- Can't do it this way, as the channel mapping must be unique. What we got this
@@ -1031,19 +1237,26 @@ convertToFullMix gui = do
     mapInsts gui convert
 
     -- remove all channels and add the FullMix channels
-    setListStoreTo (guiTvChannelsModel gui) (map (pack.showMic) [FullMixL, FullMixR])
+    setListStoreTo (guiTvChannelsModel gui)
+                   (map (T.pack . showMic) [FullMixL, FullMixR])
 
     listStoreClear (guiTvChannelMapModel gui)
 
     return ()
-    where
-        convert :: ChannelMap -> ChannelMap
-        convert x = x { cmMap = func (cmMap x) }
-        func :: [(Text, Text)] -> [(Text, Text)]
-        func [] = []
-        func ((inc, outc) : xs) | isLeftChannel outc = (inc, pack (showMic FullMixL)) : func xs
-                                 | isRightChannel outc = (inc, pack (showMic FullMixR)) : func xs
-                                 | otherwise = (inc, pack (showMic FullMixL)) : (inc, pack (showMic FullMixR)) : func xs
+  where
+    convert :: ChannelMap -> ChannelMap
+    convert x = x { cmMap = func (cmMap x) }
+    func :: [ChannelMapItem] -> [ChannelMapItem]
+    func [] = []
+    func (ChannelMapItem inc outc mn : xs)
+        | isLeftChannel outc
+        = ChannelMapItem inc (T.pack (showMic FullMixL)) mn : func xs
+        | isRightChannel outc
+        = ChannelMapItem inc (T.pack (showMic FullMixR)) mn : func xs
+        | otherwise
+        = ChannelMapItem inc (T.pack (showMic FullMixL)) mn
+            : ChannelMapItem inc (T.pack (showMic FullMixR)) mn
+            : func xs
 
 
 
@@ -1051,19 +1264,21 @@ duplicateCM :: DrumkitPage -> IO ()
 duplicateCM gui = do
     -- get seledted cm and duplicate it
     sel <- treeViewGetSelection (guiTvChannelMap gui)
-    s <- treeSelectionGetSelectedRows sel
+    s   <- treeSelectionGetSelectedRows sel
     case s of
-        ((x:_):_) -> do
+        ((x : _) : _) -> do
             val <- listStoreGetValue (guiTvChannelMapModel gui) x
             listStoreInsert (guiTvChannelMapModel gui) (x + 1) val
 
             sel1 <- treeViewGetSelection (guiTvInstruments gui)
-            s1 <- treeSelectionGetSelectedRows sel1
+            s1   <- treeSelectionGetSelectedRows sel1
             case s1 of
-                ((i:_):_) -> do
-                    cm <- listStoreGetValue (guiTvInstrumentsModel gui) i
+                ((i : _) : _) -> do
+                    cm   <- listStoreGetValue (guiTvInstrumentsModel gui) i
                     vals <- listStoreToList (guiTvChannelMapModel gui)
-                    listStoreSetValue (guiTvInstrumentsModel gui) i (cm {cmMap = vals})
+                    listStoreSetValue (guiTvInstrumentsModel gui)
+                                      i
+                                      (cm { cmMap = vals })
                 _ -> return ()
 
         _ -> return ()
@@ -1072,18 +1287,20 @@ duplicateCM gui = do
 removeCM :: DrumkitPage -> IO ()
 removeCM gui = do
     sel <- treeViewGetSelection (guiTvChannelMap gui)
-    s <- treeSelectionGetSelectedRows sel
+    s   <- treeSelectionGetSelectedRows sel
     case s of
-        ((x:_):_) -> do
+        ((x : _) : _) -> do
             listStoreRemove (guiTvChannelMapModel gui) x
 
             sel1 <- treeViewGetSelection (guiTvInstruments gui)
-            s1 <- treeSelectionGetSelectedRows sel1
+            s1   <- treeSelectionGetSelectedRows sel1
             case s1 of
-                ((i:_):_) -> do
-                    cm <- listStoreGetValue (guiTvInstrumentsModel gui) i
+                ((i : _) : _) -> do
+                    cm   <- listStoreGetValue (guiTvInstrumentsModel gui) i
                     vals <- listStoreToList (guiTvChannelMapModel gui)
-                    listStoreSetValue (guiTvInstrumentsModel gui) i (cm {cmMap = vals})
+                    listStoreSetValue (guiTvInstrumentsModel gui)
+                                      i
+                                      (cm { cmMap = vals })
                 _ -> return ()
         _ -> return ()
 
@@ -1093,7 +1310,7 @@ compileMidiMapGM gui = do
     -- also convert the drumkit to a midi map
     dr <- getDrumkit gui
     case dr of
-        Nothing -> return ()
+        Nothing      -> return ()
         Just drumkit -> do
             let midimap = getMidiMap drumkit
             setMidiMap (guiMidiMapGM gui) midimap
@@ -1104,7 +1321,7 @@ compileMidiMapDefault gui = do
     -- also convert the drumkit to a midi map
     dr <- getDrumkit gui
     case dr of
-        Nothing -> return ()
+        Nothing      -> return ()
         Just drumkit -> do
             let midimap = getMidiMap drumkit
             setMidiMap (guiMidiMapDef gui) midimap
@@ -1113,9 +1330,9 @@ compileMidiMapDefault gui = do
 channelUp :: DrumkitPage -> IO ()
 channelUp gui = do
     sel1 <- treeViewGetSelection (guiTvChannels gui)
-    s1 <- treeSelectionGetSelectedRows sel1
+    s1   <- treeSelectionGetSelectedRows sel1
     case s1 of
-        ((i:_):_) -> do
+        ((i : _) : _) -> do
             let ls = guiTvChannelsModel gui
             ch <- listStoreGetValue ls i
             listStoreRemove ls i
@@ -1128,9 +1345,9 @@ channelUp gui = do
 channelDown :: DrumkitPage -> IO ()
 channelDown gui = do
     sel1 <- treeViewGetSelection (guiTvChannels gui)
-    s1 <- treeSelectionGetSelectedRows sel1
+    s1   <- treeSelectionGetSelectedRows sel1
     case s1 of
-        ((i:_):_) -> do
+        ((i : _) : _) -> do
             let ls = guiTvChannelsModel gui
             ch <- listStoreGetValue ls i
             listStoreRemove ls i
@@ -1151,18 +1368,16 @@ sortChannels gui = do
 
 chanToOrd :: Text -> (Int, Text)
 chanToOrd x =
-    let !xx = toLower x
-        worker
-            | "kick" `isInfixOf` xx = (0, x)
-            | "snare" `isInfixOf` xx = (1, x)
-            | "hihat" `isInfixOf` xx = (2, x)
-            | "tom" `isInfixOf` xx = (3, x)
-            | "floor" `isInfixOf` xx = (4, x)
-            | "ride" `isInfixOf` xx = (5, x)
-            | "ohl" == xx = (6, x)
-            | "ohr" == xx = (6, x)
-            | "room" `isInfixOf` xx = (7, x)
-            | "fullmix" `isInfixOf` xx = (8, x)
-            | otherwise = (100, x)
-    in
-        worker
+    let !xx = T.toLower x
+        worker | "kick" `T.isInfixOf` xx    = (0, x)
+               | "snare" `T.isInfixOf` xx   = (1, x)
+               | "hihat" `T.isInfixOf` xx   = (2, x)
+               | "tom" `T.isInfixOf` xx     = (3, x)
+               | "floor" `T.isInfixOf` xx   = (4, x)
+               | "ride" `T.isInfixOf` xx    = (5, x)
+               | "ohl" == xx              = (6, x)
+               | "ohr" == xx              = (6, x)
+               | "room" `T.isInfixOf` xx    = (7, x)
+               | "fullmix" `T.isInfixOf` xx = (8, x)
+               | otherwise                = (100, x)
+    in  worker

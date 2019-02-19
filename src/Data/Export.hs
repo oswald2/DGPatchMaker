@@ -122,8 +122,10 @@ conduitDrumKitXML dr = tag
         Just g  -> attr "group" g
         Nothing -> mempty
     channelmap x = foldr chm mempty (cmMap x)
-    chm (c1, c2) b =
-        tag "channelmap" (attr "in" c1 <> attr "out" c2) mempty <> b
+    chm (ChannelMapItem c1 c2 mn) b =
+        case mn of
+            True -> tag "channelmap" (attr "in" c1 <> attr "out" c2 <> attr "main" "true") mempty <> b
+            False -> tag "channelmap" (attr "in" c1 <> attr "out" c2) mempty <> b
 
 conduitFullDrumKit :: Monad m => Drumkit -> ConduitT () Event m ()
 conduitFullDrumKit dr = do
