@@ -7,6 +7,7 @@ module Data.Checkers
     ,checkRational
     ,checkOctet
     ,checkFractional
+    ,checkSampleRate
     )
 where
 
@@ -38,6 +39,12 @@ checkInt str low high ref =
                     | x > high = Left $ which `T.append` " value must be <= " `T.append` (T.pack (show high))
                     | otherwise = Right x
 
+checkSampleRate :: Text -> Either Text Int
+checkSampleRate str =
+    case parse sampleRate "" (T.unpack str) of
+        Left err -> Left ("Illegal sample rate: " <> T.pack (show err))
+        Right x -> Right x
+                    
 
 checkIntList :: Text -> Integer -> Integer -> Maybe Text -> Either Text [Integer]
 checkIntList str low high ref =
@@ -95,6 +102,16 @@ number :: Parsec String u Integer
 number = do
     let lexer = makeTokenParser haskellStyle
     integer lexer
+
+sampleRate :: Parsec String u Int 
+sampleRate = do 
+    pre <- many digit
+    void $ char '.'
+    post <- many digit
+    let 
+        postN = read post
+        sr = read pre * 10 ^ (P.length post) + postN
+    return sr
 
 fl :: Parsec String u Double
 fl = do

@@ -106,7 +106,8 @@ data InstrumentPage = InstrumentPage {
     guiInstNrHits :: NrHitsDialog,
     guiComboChannel :: ComboBox,
     guiEntryFileName :: Entry,
-    guiHitPowerDialog :: HitPowerDialog
+    guiHitPowerDialog :: HitPowerDialog,
+    guiUpdateSampleRate :: Int -> IO ()
     }
 
 
@@ -121,8 +122,10 @@ instrumentPageNew
     -> IORef (V.Vector InstrumentPage)
     -> FileHandlingDialog
     -> ErrorDialog
+    -> (Int -> IO ())
     -> IO InstrumentPage
-instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog errDiag
+instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
+    errDiag updateSampleRate
     = do
     -- Create the builder, and load the UI file
         builder <- builderNew
@@ -255,6 +258,7 @@ instrumentPageNew parentWindow notebook basedir samplesDir combo ioref fhDialog 
                 , guiComboChannel         = comboChan
                 , guiEntryFileName        = entryFileName
                 , guiHitPowerDialog       = hitPowerDiag
+                , guiUpdateSampleRate     = updateSampleRate
                 }
 
         -- set the default values for this instrument page
@@ -365,7 +369,7 @@ dropAction gui x = do
             ("Errors: " `append` (T.intercalate "\n" (lefts res)))
         False -> do
             basepath <- entryGetText (guiIPEntryBaseDir gui)
-            af       <- getAudioSamplesFromFiles (unpack basepath) (rights res)
+            af       <- getAudioSamplesFromFiles (guiUpdateSampleRate gui) (unpack basepath) (rights res)
 
             let ls = guiInstSamplesViewModel gui
 
@@ -418,14 +422,18 @@ checkFileNames = chk
                 else Left $ "Illegal file: " `T.append` (T.pack file)
 
 
-getAudioSamplesFromFiles :: FilePath -> [FilePath] -> IO [AudioFile]
-getAudioSamplesFromFiles basepath files = do
-    res <- mapM (getAudioSampleFromFile basepath) files
+getAudioSamplesFromFiles :: (Int -> IO ()) -> FilePath -> [FilePath] -> IO [AudioFile]
+getAudioSamplesFromFiles updateSampleRate basepath files = do
+    res <- mapM (getAudioSampleFromFile updateSampleRate basepath) files
     return (P.concat res)
 
-getAudioSampleFromFile :: FilePath -> FilePath -> IO [AudioFile]
-getAudioSampleFromFile basepath file = do
+getAudioSampleFromFile :: (Int -> IO ()) -> FilePath -> FilePath -> IO [AudioFile]
+getAudioSampleFromFile updateSampleRate basepath file  = do
     info <- getFileInfo file
+
+    -- set the sample rate
+    updateSampleRate (samplerate info)
+
     let idx = [1 .. channels info]
 
     let relName x =
@@ -928,7 +936,7 @@ addSamples gui = do
     names <- loadSamples gui
     unless (P.null names) $ do
         basepath <- unpack <$> entryGetText (guiIPEntryBaseDir gui)
-        af       <- getAudioSamplesFromFiles basepath names
+        af       <- getAudioSamplesFromFiles (guiUpdateSampleRate gui) basepath names
         mapM_ (listStoreAppend (guiInstSamplesViewModel gui)) af
 
         updateHitSample gui hsAddSamples af

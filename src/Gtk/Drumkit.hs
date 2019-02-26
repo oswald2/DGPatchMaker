@@ -1,5 +1,11 @@
 {-# LANGUAGE OverloadedStrings, BangPatterns #-}
-module Gtk.Drumkit where
+module Gtk.Drumkit 
+    (
+        DrumkitPage
+        , initDrumkitPage
+        , setDkSampleRate    
+    )
+where
 
 
 --import           ClassyPrelude
@@ -19,7 +25,9 @@ import           Data.Drumgizmo
 import           Data.Import
 import           Data.Either
 import           Data.List                     as L
-                                                ( find, sortOn )
+                                                ( find
+                                                , sortOn
+                                                )
 
 
 import           Data.Vector                    ( Vector )
@@ -30,6 +38,9 @@ import qualified Data.Text                     as T
 import           Data.IORef
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as S
+import           Data.Checkers
+import           Data.Defaults
+
 
 import           Graphics.UI.Gtk               as G
 
@@ -318,11 +329,26 @@ getDkDescription dkp = do
     res          <- textBufferGetText buffer start end False
     return $ T.filter (/= '\n') res
 
-getDkSampleRate :: DrumkitPage -> IO Text
-getDkSampleRate dkp = entryGetText (guiDkSampleRate dkp)
+getDkSampleRateText :: DrumkitPage -> IO Text
+getDkSampleRateText dkp = entryGetText (guiDkSampleRate dkp)
 
-setDkSampleRate :: DrumkitPage -> Text -> IO ()
-setDkSampleRate dkp sr = entrySetText (guiDkSampleRate dkp) sr
+getDkSampleRate :: DrumkitPage -> IO Int
+getDkSampleRate dkp = do
+    sr <- entryGetText (guiDkSampleRate dkp)
+    case checkSampleRate sr of
+        Left  err -> displayErrorBox (guiDkParentWindow dkp) err >> return defaultSampleRate
+        Right x   -> pure x
+
+setDkSampleRate :: DrumkitPage -> Int -> IO ()
+setDkSampleRate dkp sr = do
+    sr' <- getDkSampleRate dkp
+    if sr' == sr 
+        then pure ()
+        else entrySetText (guiDkSampleRate dkp) (T.pack (show sr))
+
+
+setDkSampleRateText :: DrumkitPage -> Text -> IO ()
+setDkSampleRateText dkp sr = entrySetText (guiDkSampleRate dkp) sr
 
 
 setDkDescription :: DrumkitPage -> Text -> IO ()
@@ -525,6 +551,7 @@ importDrumDropsDrumKit' gui = do
                                  (guiDkInstrumentPages gui)
                                  (guiFhDialog gui)
                                  (guiErrDiag gui)
+                                 (setDkSampleRate gui)
         let instName = pathToInstrument samplesDir path
         _ <- notebookAppendPage (guiDkInstrumentsNotebook gui)
                                 (instrumentPageGetMainBox ins)
@@ -1048,7 +1075,7 @@ compileDrumkit gui = do
         else do
             nm   <- getDkName gui
             desc <- getDkDescription gui
-            sr   <- getDkSampleRate gui
+            sr   <- getDkSampleRateText gui
 
             let drumkit = generateDrumkit nm desc (Just sr) insts
                 insts   = rights (V.toList instF)
@@ -1146,6 +1173,8 @@ loadDrumkit' gui file = do
         Left err -> displayErrorBox (guiDkParentWindow gui)
                                     ("Error on loading drumkit: " <> err)
         Right dk -> do
+            --putStrLn $ "Imported Drumkit:\n" <> show dk
+
             resetDrumkit gui
 
             let basepath = getBasePath file
@@ -1162,14 +1191,14 @@ loadDrumkit' gui file = do
 
 showDrumkit :: DrumkitPage -> Drumkit -> IO ()
 showDrumkit gui dk = do
-    entrySetText (guiDkName gui)     (dkName dk)
+    entrySetText (guiDkName gui) (dkName dk)
     setDkDescription gui (dkDescription dk)
     case dkSampleRate dk of
-        Just sr -> setDkSampleRate gui sr
+        Just sr -> setDkSampleRateText gui sr
         Nothing -> return ()
 
     -- set the actual drumkit
-    setDrumkit gui  dk
+    setDrumkit gui dk
 
     -- set the channels for viewing
     setChannels gui (dkChannels dk)
@@ -1191,6 +1220,7 @@ loadInstrumentFiles gui path files = do
                                  (guiDkInstrumentPages gui)
                                  (guiFhDialog gui)
                                  (guiErrDiag gui)
+                                 (setDkSampleRate gui)
         void $ notebookAppendPage (guiDkInstrumentsNotebook gui)
                                   (instrumentPageGetMainBox ins)
                                   name
@@ -1375,9 +1405,9 @@ chanToOrd x =
                | "tom" `T.isInfixOf` xx     = (3, x)
                | "floor" `T.isInfixOf` xx   = (4, x)
                | "ride" `T.isInfixOf` xx    = (5, x)
-               | "ohl" == xx              = (6, x)
-               | "ohr" == xx              = (6, x)
+               | "ohl" == xx                = (6, x)
+               | "ohr" == xx                = (6, x)
                | "room" `T.isInfixOf` xx    = (7, x)
                | "fullmix" `T.isInfixOf` xx = (8, x)
-               | otherwise                = (100, x)
+               | otherwise                  = (100, x)
     in  worker

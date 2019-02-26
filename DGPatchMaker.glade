@@ -466,7 +466,7 @@
                                     <property name="shadow_type">in</property>
                                     <child>
                                       <object class="GtkTreeView" id="treeviewChannels">
-                                        <property name="width_request">80</property>
+                                        <property name="width_request">120</property>
                                         <property name="height_request">400</property>
                                         <property name="visible">True</property>
                                         <property name="can_focus">True</property>
@@ -560,7 +560,7 @@
                       <object class="GtkPaned" id="paned2">
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
-                        <property name="position">700</property>
+                        <property name="position">550</property>
                         <child>
                           <object class="GtkFrame" id="frame4">
                             <property name="height_request">50</property>

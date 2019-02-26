@@ -1,24 +1,24 @@
 {-# LANGUAGE OverloadedStrings, BangPatterns #-}
-module GtkInterface
-where
+module GtkInterface where
 
 
-import Control.Monad  as M (void)
-import Control.Monad.IO.Class (liftIO)
+import           Control.Monad                 as M
+                                                ( void )
+import           Control.Monad.IO.Class         ( liftIO )
 
-import Graphics.UI.Gtk
+import           Graphics.UI.Gtk
 
-import Data.Text as T
-import Data.IORef
-import Data.Vector as V
+import           Data.Text                     as T
+import           Data.IORef
+import           Data.Vector                   as V
 
-import Gtk.MainWindow
-import Gtk.InstrumentFrame
-import Gtk.Drumkit
-import Gtk.FileHandlingDialog
-import Gtk.ErrorDialog
+import           Gtk.MainWindow
+import           Gtk.InstrumentFrame
+import           Gtk.Drumkit
+import           Gtk.FileHandlingDialog
+import           Gtk.ErrorDialog
 
-import Gtk.DGPatchMakerBuilder
+import           Gtk.DGPatchMakerBuilder
 
 
 
@@ -39,39 +39,67 @@ initMainWindow = do
 
     notebook <- builderGetObject builder castToNotebook ("notebookMain" :: Text)
     itemQuit <- builderGetObject builder castToMenuItem ("menuitemQuit" :: Text)
-    notebookInstruments <- builderGetObject builder castToNotebook ("notebookInstruments" :: Text)
+    notebookInstruments <- builderGetObject builder
+                                            castToNotebook
+                                            ("notebookInstruments" :: Text)
 
-    buttonNewInstrument <- builderGetObject builder castToButton ("buttonNewInstrument" :: Text)
-    entryBaseDirectory <- builderGetObject builder castToEntry ("entryBaseDirectory" :: Text)
-    entrySamplesDir <- builderGetObject builder castToEntry ("entrySamplesDirectory" :: Text)
+    buttonNewInstrument <- builderGetObject builder
+                                            castToButton
+                                            ("buttonNewInstrument" :: Text)
+    entryBaseDirectory <- builderGetObject builder
+                                           castToEntry
+                                           ("entryBaseDirectory" :: Text)
+    entrySamplesDir <- builderGetObject builder
+                                        castToEntry
+                                        ("entrySamplesDirectory" :: Text)
 
-    progress <- builderGetObject builder castToProgressBar ("progressbar" :: Text)
+    progress <- builderGetObject builder
+                                 castToProgressBar
+                                 ("progressbar" :: Text)
 
     combo <- builderGetObject builder castToComboBox ("comboboxParser" :: Text)
 
-    fhDialog <- initFileHandlingDialog builder
-    errDiag <- initErrorDialog builder
+    fhDialog    <- initFileHandlingDialog builder
+    errDiag     <- initErrorDialog builder
 
-    instPages <- newIORef (V.empty)
+    instPages   <- newIORef (V.empty)
 
     -- initialise the drumkit page
-    drumkitPage <- initDrumkitPage window builder notebookInstruments progress combo entryBaseDirectory entrySamplesDir instPages fhDialog
+    drumkitPage <- initDrumkitPage window
+                                   builder
+                                   notebookInstruments
+                                   progress
+                                   combo
+                                   entryBaseDirectory
+                                   entrySamplesDir
+                                   instPages
+                                   fhDialog
 
-    let gui = MainWindow {
-        guiWindow = window,
-        guiNotebook = notebook,
-        guiNotebookInstruments = notebookInstruments,
-        guiInstrumentPages = instPages,
-        guiProgress = progress,
-        guiDrumkitPage = drumkitPage
-        }
+    let gui = MainWindow
+            { guiWindow              = window
+            , guiNotebook            = notebook
+            , guiNotebookInstruments = notebookInstruments
+            , guiInstrumentPages     = instPages
+            , guiProgress            = progress
+            , guiDrumkitPage         = drumkitPage
+            }
 
     --insertInstrumentPage inst
 
     void $ on buttonNewInstrument buttonActivated $ do
         let name = "NewInstrument" :: Text
-        ins <- instrumentPageNew window notebookInstruments entryBaseDirectory entrySamplesDir combo instPages fhDialog errDiag
-        i <- notebookAppendPage notebookInstruments (instrumentPageGetMainBox ins) name
+        ins <- instrumentPageNew window
+                                 notebookInstruments
+                                 entryBaseDirectory
+                                 entrySamplesDir
+                                 combo
+                                 instPages
+                                 fhDialog
+                                 errDiag
+                                 (setDkSampleRate drumkitPage)
+        i <- notebookAppendPage notebookInstruments
+                                (instrumentPageGetMainBox ins)
+                                name
         instrumentPageInsert ins
         notebookSetCurrentPage notebookInstruments i
         instrumentPageSetInstrumentName ins name
@@ -83,11 +111,15 @@ initMainWindow = do
 
     -- setup about dialog
     aboutDialog <- aboutDialogNew
-    set aboutDialog [aboutDialogProgramName := ("DrumGizmo Patch Maker":: Text),
-        aboutDialogVersion := ("V0.8" :: Text),
-        aboutDialogCopyright := ("(C) by Michael Oswald" :: Text),
-            aboutDialogComments := ("A tool for creating patches for the drumgizmo plugin\n\n" :: Text),
-        aboutDialogAuthors := [("Michael Oswald" :: Text)]
+    set
+        aboutDialog
+        [ aboutDialogProgramName := ("DrumGizmo Patch Maker" :: Text)
+        , aboutDialogVersion := ("V0.8" :: Text)
+        , aboutDialogCopyright := ("(C) by Michael Oswald" :: Text)
+        , aboutDialogComments
+            := ("A tool for creating patches for the drumgizmo plugin\n\n" :: Text
+               )
+        , aboutDialogAuthors := [("Michael Oswald" :: Text)]
         ]
    -- Display the window
     widgetShowAll window

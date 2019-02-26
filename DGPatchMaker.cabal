@@ -62,6 +62,7 @@ executable DGPatchMaker
       ,Data.Export
       ,Data.Import
       ,Data.Types
+      ,Data.Defaults
       ,Gtk.Colors
       ,Gtk.DGPatchMakerBuilder
       ,Gtk.Drumkit
