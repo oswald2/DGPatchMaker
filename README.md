@@ -4,7 +4,7 @@ A tool to create patches for the LV2 Drumgizmo plugin from existing sample libra
 
 ## What is the difference to DGEdit?
 
-DGEdit as provided from the developers of DrumGizmo is an editor to create drumkits for DrumGizmo from self-sampled tracks. This means, the drumkit is recorded on multiple tracks, each hit one of the other has rang out. To create a drumkit patch out of these tracks is quite a hassle, therefore the DGEdit helps here with splitting the available tracks on the right locations and assigning them to instruments and so on.
+DGEdit as provided from the developers of DrumGizmo is an editor to create drumkits for DrumGizmo from self-sampled tracks. This means, the drumkit is recorded on multiple tracks, each hit one after the other has rang out. To create a drumkit patch out of these tracks is quite a hassle, therefore the DGEdit helps here with splitting the available tracks on the right locations and assigning them to instruments and so on.
 
 In contrast, DGPatchMaker is designed for creating DrumGizmo patches from existing drum sample libraries in WAV format. So, ready made libraries available open source as well as from commercial companies.
 
@@ -55,15 +55,15 @@ DrumGizmo works by mapping the recordings of the drum shells via microphones fro
 ### Instruments 
 
 An instrument in DrumGizmo is every distinct playable sound, often mapping to real instruments, but not always. E.g. a kick drum is mapped to one instrument,
-while on snares there is often articulation done like normal snare, rimshot, stick, snare-roll etc. Each of these are of course in reality played on the same instrument, but are mapped to different DrumGizmo-instruments to provide this articulation.
+while on snares there is often articulation done like normal snare, rimshot, side-stick, snare-roll etc. Each of these are of course in reality played on the same instrument, but are mapped to different DrumGizmo-instruments to provide this articulation.
 
-The instruments contain samples of the hits with different velocities, and often the same hit with the same velocities so that DrumGizmo can choose the sample to use. Since each real recorded hit sounds a bit different, even if they are the same velocity, this brings more realism to the sounds.
+The instruments contain samples of the hits with different velocities, and often also the same hit with the same velocities so that DrumGizmo can choose the sample to use. Since each real recorded hit sounds a bit different, even if they are the same velocity, this brings more realism to the sounds.
 
 ### Drumkit
 
-The drumkit itself then maps all these defined instruments to the output channels. These channels correspond to the microphones with which the drumkit was recorded. On the DrumGizmo kits downloadable from it's homepage, every hit utilisies every microphone, just like on a real recording (e.g. a snare hit is also heard on the kick microphone, just quieter). 
+The drumkit itself then maps all these defined instruments to the output channels. These channels correspond to the microphones with which the drumkit was recorded. On the DrumGizmo kits downloadable from it's homepage, every hit utilises every microphone, just like on a real recording (e.g. a snare hit is also heard on the kick microphone, just quieter). 
 
-On delivered sample libraries this is often not the case, the shells are on their own, but are also present in the overhead- and room-microphones, so these are the only ones with bleed normally available. This makes the sound "cleaner", more defined, but also a bit less realistic.
+On delivered sample libraries this is often not the case, the shells are on their own, but are also present in the overhead- and room-microphones, so these are the only ones with bleed available. This makes the sound "cleaner", more defined, but also a bit less realistic.
 
 ### Midimap
 
@@ -76,7 +76,7 @@ The midi-map then specifies, which MIDI note plays which instrument (in the Drum
 DGPatchMaker provides two basic workflows:
  
  1. Automatic: this can only be done for drum sample libraries delivered from DrumDrops. This was the initial reason of why DGPatchMaker was developed primarily. DrumDrops libraries have certain conventions in their naming, making it easier to make sense of the structure of the libraries (e.g. in the name of the wav sample is defined which instrument, which articulation, which velocity, and which round-robin round while instruments can be found in distinct folders). As other sample libraries have different conventions, the automatic mode is useless for these libraries and will not work. 
- 2. Manual: one can manually create and edit drumkit patches for DrumGizmo. This has been done for the open source Salamander Kit as well as the TChackPoum kit, which have very different structure conventions than the DrumDrops libraries. This process is a bit more involved, but is most probably the standard process for all other libraries.
+ 2. Manual: one can manually create and edit drumkit patches for DrumGizmo. This has been done for the open source Salamander Kit as well as the SM MegaReaper kit, which have very different structure conventions than the DrumDrops libraries. This process is a bit more involved, but is most probably the standard process for all other libraries.
 
 As the automatic workflow is mostly not available, the description is for the manual workflow.
 
@@ -111,7 +111,7 @@ Click the "Import DrumDrops Drumkit" button on top of DGPatchMaker. This will st
 Since DrumGizmo underwent a change in it's file format, also the user interface was slightly changed to be able to handle that. The automatic import can't handle the main outputs flag, which are used for the bleed control inside DrumGizmo. These need to be set manually. To understand this setting, one needs to understand how the bleed control works: it reduces the amplitude of the sample played on other channels which are not selected main. So the instrument needs to have set the "Main" tag checked in the channel map for it's own channels, while the other are bleed-controlled. 
 
 E.g. for the Crocell Kit from the DrumGizmo site, the KDrumL instrument is mapped to all channels, but its channels tagged as "Main" are the "KDrumInside" and "KDrumOutside" channels, as these are the native channels the kick goes out to. The output to all other channels will be controlled by the bleed control. 
-For cymbals and the hihat, the Crocell Kit defines that they "Main" channels are the "AmbLeft" and "AmbRight" (the room microphones) and all overhead channels ("OHLeft", "OHRight", "OHCenter").
+For cymbals and the hihat, the Crocell Kit defines that their "Main" channels are the "AmbLeft" and "AmbRight" (the room microphones) and all overhead channels ("OHLeft", "OHRight", "OHCenter").
 
 It is also important to add a Drumkit Name and a Description in the relevant fields, before saving the drumkit.
 
@@ -143,7 +143,7 @@ The manual workflow consists of the following steps:
    * `Kick`
    * `Snare`
    * `HiHat`
-   * `Tom <TomType>` where *TomType* is either `RackTom <n>` where n is a number 1..5 or `Floor <n>` where n is a number 1..3
+   * `Tom <TomType>` where *TomType* is either `RackTom <n>` where n is a number 1..5 or `Floor <n>` where n is a number 1..3. Note that these types have to be one field and have to be put into parenthesis to match this (e.g. "Tom (RackTom 1)")
    * `Cymbal`
    * `Ride`
    * `Shaker`
