@@ -154,3 +154,5 @@ The manual workflow consists of the following steps:
  5. Enter a "Filename" for the generated XML output file in the DrumGizmo patch. Note that this can be different to the instrument name.
  6. Load the samples for this instrument. 
 
+
+*<To be continued...>*
