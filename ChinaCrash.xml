@@ -1,0 +1,544 @@
+﻿<instrument version="2.0" name="ChinaCrash">
+    <samples>
+        <sample name="ChinaCrash1" power="1.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V1_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V1_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V1_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V1_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash2" power="1.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V1_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V1_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V1_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V1_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash3" power="1.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V1_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V1_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V1_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V1_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash4" power="2.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V2_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V2_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V2_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V2_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash5" power="2.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V2_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V2_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V2_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V2_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash6" power="2.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V2_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V2_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V2_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V2_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash7" power="3.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V3_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V3_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V3_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V3_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash8" power="3.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V3_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V3_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V3_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V3_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash9" power="3.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V3_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V3_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V3_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V3_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash10" power="4.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V4_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V4_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V4_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V4_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash11" power="4.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V4_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V4_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V4_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V4_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash12" power="4.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V4_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V4_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V4_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V4_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash13" power="5.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V5_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V5_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V5_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V5_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash14" power="5.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V5_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V5_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V5_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V5_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash15" power="5.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V5_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V5_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V5_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V5_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash16" power="6.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V6_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V6_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V6_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V6_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash17" power="6.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V6_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V6_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V6_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V6_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash18" power="6.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V6_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V6_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V6_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V6_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash19" power="7.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V7_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V7_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V7_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V7_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash20" power="7.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V7_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V7_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V7_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V7_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash21" power="7.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V7_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V7_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V7_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V7_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash22" power="8.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V8_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V8_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V8_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V8_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash23" power="8.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V8_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V8_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V8_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V8_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash24" power="8.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V8_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V8_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V8_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V8_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash25" power="9.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V9_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V9_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V9_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V9_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash26" power="9.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V9_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V9_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V9_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V9_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash27" power="9.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V9_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V9_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V9_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V9_RR3.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash28" power="10.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V10_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V10_RR1.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V10_RR1.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V10_RR1.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash29" power="10.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V10_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V10_RR2.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V10_RR2.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V10_RR2.wav"
+              filechannel="2"/>
+        </sample>
+        <sample name="ChinaCrash30" power="10.0">
+            <audiofile
+              channel="OHL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V10_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="OHR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNOH_HT_005_V10_RR3.wav"
+              filechannel="2"/>
+            <audiofile
+              channel="RoomL"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V10_RR3.wav"
+              filechannel="1"/>
+            <audiofile
+              channel="RoomR"
+              file="../../Kontakt Pack Samples/China Crash/CHN_CRSH_CNRM_HT_005_V10_RR3.wav"
+              filechannel="2"/>
+        </sample>
+    </samples>
+</instrument>

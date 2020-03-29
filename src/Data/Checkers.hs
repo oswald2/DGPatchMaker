@@ -16,6 +16,7 @@ import Control.Monad (void)
 import Text.Parsec
 import Text.Parsec.Token
 import Text.Parsec.Language
+import Text.ParserCombinators.Parsec.Number (int)
 import Prelude as P
 import Data.Ratio
 import Data.Text as T
@@ -95,7 +96,7 @@ group2 (x:y:xs) = [x,y] : group2 xs
 
 
 fromHex :: String -> Integer
-fromHex = (fst.P.head.readHex)
+fromHex = fst . P.head . readHex
 
 
 number :: Parsec String u Integer
@@ -105,13 +106,18 @@ number = do
 
 sampleRate :: Parsec String u Int 
 sampleRate = do 
-    pre <- many digit
-    void $ char '.'
-    post <- many digit
+    pre <- int 
+
+    post <- option 0 decim
     let 
-        postN = read post
-        sr = read pre * 10 ^ (P.length post) + postN
+        sr = if post /= 0 then pre * 1000 + post else pre
     return sr
+    where 
+        decim = do 
+            void $ char '.'
+            int
+
+
 
 fl :: Parsec String u Double
 fl = do

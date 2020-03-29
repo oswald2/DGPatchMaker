@@ -86,7 +86,7 @@ executable DGPatchMaker
                        vector,
                        directory,
                        filepath,
-                       parsec3,
+                       parsec,
                        parsec-numbers,
                        xmlgen,
                        bytestring,

@@ -4,11 +4,9 @@ module Main
 where
 
 
-import System.FilePath
 import System.Environment
 import System.Exit
 
-import Data.DrumDrops.Types
 import Data.DrumDrops.Utils
 
 import Data.Text as T
@@ -17,10 +15,6 @@ import Data.Text.IO as T
 --import Data.List (sort)
 --import Data.Either
 
-import Data.Drumgizmo
-import Data.Export
-
-import Data.Types
 
 
 str1 :: String

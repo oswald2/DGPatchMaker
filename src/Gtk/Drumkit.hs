@@ -335,9 +335,12 @@ getDkSampleRateText dkp = entryGetText (guiDkSampleRate dkp)
 getDkSampleRate :: DrumkitPage -> IO Int
 getDkSampleRate dkp = do
     sr <- entryGetText (guiDkSampleRate dkp)
-    case checkSampleRate sr of
-        Left  err -> displayErrorBox (guiDkParentWindow dkp) err >> return defaultSampleRate
-        Right x   -> pure x
+    if T.null sr 
+        then return defaultSampleRate  
+        else 
+            case checkSampleRate sr of
+                Left  err -> displayErrorBox (guiDkParentWindow dkp) err >> return defaultSampleRate
+                Right x   -> pure x
 
 setDkSampleRate :: DrumkitPage -> Int -> IO ()
 setDkSampleRate dkp sr = do

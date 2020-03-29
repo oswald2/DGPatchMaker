@@ -1,0 +1,15 @@
+.ghc.environment.x86_64-linux-8.4.4
+.ghc.environment.x86_64-linux-8.6.3
+dg.log
+DGPatchMaker.glade~
+InstrumentPage.glade~
+LICENSE.orig
+README.html
+dist/
+dist-newstyle/
+.stack-work
+
+src/Data/Types.hs.orig
+src/Gtk/.goutputstream-UA6RMY
+cabal.project.local~
+cabal.project.local

@@ -35,6 +35,8 @@ initMainWindow = do
     -- Retrieve some objects from the UI
     window <- builderGetObject builder castToWindow ("mainWindow" :: Text)
 
+    windowMaximize window
+
     set window [windowTitle := ("DrumgGizmo Patch Maker" :: Text)]
 
     notebook <- builderGetObject builder castToNotebook ("notebookMain" :: Text)
