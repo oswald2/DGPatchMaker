@@ -89,7 +89,7 @@ initMainWindow = do
     --insertInstrumentPage inst
 
     void $ on buttonNewInstrument buttonActivated $ do
-        let name = "NewInstrument" :: Text
+        let name = "New Instrument" :: Text
         ins <- instrumentPageNew window
                                  notebookInstruments
                                  entryBaseDirectory

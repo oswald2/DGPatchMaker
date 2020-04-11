@@ -33,15 +33,12 @@ data Sample =
     deriving (Show, Eq)
 
 instance Ord Sample where
-    compare (Sample {saVelocity = v1, saRound = rr1}) (Sample {saVelocity = v2, saRound = rr2}) =
-        if v1 < v2
-            then LT
-            else if v1 == v2
-                then
-                    if isJust rr1 && isJust rr2
+    compare (Sample {saVelocity = v1, saRound = rr1}) (Sample {saVelocity = v2, saRound = rr2}) 
+        | v1 < v2 = LT
+        | v1 == v2 = if isJust rr1 && isJust rr2
                         then compare rr1 rr2
                         else EQ
-                else GT
+        | otherwise = GT
 
 
 data SampleGroup = SampleGroup {
