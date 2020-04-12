@@ -432,6 +432,7 @@ getAudioSampleFromFile updateSampleRate basepath file  = do
     info <- getFileInfo file
 
     -- set the sample rate
+    P.putStrLn $ "Setting sample rate from file: " <> show (samplerate info)
     updateSampleRate (samplerate info)
 
     let idx = [1 .. channels info]

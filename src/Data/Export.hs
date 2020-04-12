@@ -110,7 +110,7 @@ conduitDrumKitXML dr = tag
     channels = tag "channels" mempty (foldr ch mempty (dkChannels dr))
     ch x b = tag "channel" (attr "name" x) mempty <> b
     instruments =
-        tag "instruments" mempty ((foldr ins mempty (dkInstruments dr)))
+        tag "instruments" mempty (foldr ins mempty (dkInstruments dr))
     ins x b =
         tag
                 "instrument"

@@ -39,8 +39,8 @@ import qualified Data.Text                     as T
 import           Data.IORef
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as S
-import           Data.Checkers
-import           Data.Defaults
+--import           Data.Checkers
+--import           Data.Defaults
 
 
 import           Graphics.UI.Gtk               as G
@@ -322,22 +322,18 @@ getDkDescription dkp = do
 getDkSampleRateText :: DrumkitPage -> IO Text
 getDkSampleRateText dkp = entryGetText (guiDkSampleRate dkp)
 
-getDkSampleRate :: DrumkitPage -> IO Int
-getDkSampleRate dkp = do
-  sr <- entryGetText (guiDkSampleRate dkp)
-  if T.null sr
-    then return defaultSampleRate
-    else case checkSampleRate sr of
-      Left err ->
-        displayErrorBox (guiDkParentWindow dkp) err >> return defaultSampleRate
-      Right x -> pure x
+-- getDkSampleRate :: DrumkitPage -> IO Int
+-- getDkSampleRate dkp = do
+--   sr <- entryGetText (guiDkSampleRate dkp)
+--   if T.null sr
+--     then return defaultSampleRate
+--     else case checkSampleRate sr of
+--       Left err ->
+--         displayErrorBox (guiDkParentWindow dkp) err >> return defaultSampleRate
+--       Right x -> pure x
 
 setDkSampleRate :: DrumkitPage -> Int -> IO ()
-setDkSampleRate dkp sr = do
-  sr' <- getDkSampleRate dkp
-  if sr' == sr
-    then pure ()
-    else entrySetText (guiDkSampleRate dkp) (T.pack (show sr))
+setDkSampleRate dkp sr = entrySetText (guiDkSampleRate dkp) (T.pack (show sr))
 
 
 setDkSampleRateText :: DrumkitPage -> Text -> IO ()
