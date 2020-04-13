@@ -505,7 +505,7 @@ clearDrumkit gui = do
   writeIORef (guiDrumkit gui) Nothing
   widgetSetSensitive (guiBtCompileGM gui)  False
   widgetSetSensitive (guiBtCompileDef gui) False
-  setDkMetaData gui (Just clearMetadata)
+  setDkMetaData gui (Just clearMetaData)
   
 
 getDrumkit :: DrumkitPage -> IO (Maybe Drumkit)
