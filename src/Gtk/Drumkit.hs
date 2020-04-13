@@ -3,6 +3,8 @@ module Gtk.Drumkit
   ( DrumkitPage
   , initDrumkitPage
   , setDkSampleRate
+  , enableDkMetaData
+  , setDkMetaData
   )
 where
 
@@ -13,6 +15,7 @@ import           System.FilePath.Find          as F
 import           System.FilePath
 
 import qualified Data.Vector                   as V
+import           Data.Maybe
 
 import           Control.Exception
 import           Control.Monad
@@ -85,7 +88,17 @@ data DrumkitPage = DrumkitPage {
     guiChannelMapMenu :: Menu,
     guiBtCompileGM :: Button,
     guiBtCompileDef :: Button,
-    guiSelectedChannelMap :: IORef (Maybe (Int, ChannelMap))
+    guiSelectedChannelMap :: IORef (Maybe (Int, ChannelMap)),
+    guiMetaVersion :: Entry,
+    guiMetaTitle :: Entry,
+    guiMetaLogo :: Entry,
+    guiMetaDescription :: TextView,
+    guiMetaLicense :: TextView,
+    guiMetaNotes :: TextView,
+    guiMetaAuthor :: Entry,
+    guiMetaEMail :: Entry,
+    guiMetaWebSite :: Entry,
+    guiMetaEnable :: CheckButton
 }
 
 
@@ -152,6 +165,28 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     tvMidiDef <- builderGetObject builder
                                   castToTreeView
                                   ("treeviewMidiMapDef" :: Text)
+
+
+    metaenable <- builderGetObject builder
+                                   castToCheckButton
+                                   ("checkButtonMeta" :: Text)
+    evers   <- builderGetObject builder castToEntry ("entryMetaVersion" :: Text)
+    etitle  <- builderGetObject builder castToEntry ("entryMetaTitle" :: Text)
+    elogo   <- builderGetObject builder castToEntry ("entryMetaLogo" :: Text)
+    tvdescr <- builderGetObject builder
+                                castToTextView
+                                ("textviewMetaDescription" :: Text)
+    tvlicense <- builderGetObject builder
+                                  castToTextView
+                                  ("textviewMetaLicense" :: Text)
+    tvnotes <- builderGetObject builder
+                                castToTextView
+                                ("textviewMetaNotes" :: Text)
+    eauthor  <- builderGetObject builder castToEntry ("entryMetaAuthor" :: Text)
+    eemail   <- builderGetObject builder castToEntry ("entryMetaEMail" :: Text)
+    ewebsite <- builderGetObject builder
+                                 castToEntry
+                                 ("entryMetaWebsite" :: Text)
 
     lsm             <- listStoreNew []
     lsinst          <- listStoreNew []
@@ -269,8 +304,17 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
                           , guiBtCompileGM           = btCompileGM
                           , guiBtCompileDef          = btCompileDef
                           , guiSelectedChannelMap    = selIoRef
+                          , guiMetaVersion           = evers
+                          , guiMetaTitle             = etitle
+                          , guiMetaLogo              = elogo
+                          , guiMetaDescription       = tvdescr
+                          , guiMetaLicense           = tvlicense
+                          , guiMetaNotes             = tvnotes
+                          , guiMetaAuthor            = eauthor
+                          , guiMetaEMail             = eemail
+                          , guiMetaWebSite           = ewebsite
+                          , guiMetaEnable            = metaenable
                           }
-
     --setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
     setDkDescription gui ""
 
@@ -344,6 +388,35 @@ setDkDescription :: DrumkitPage -> Text -> IO ()
 setDkDescription dkp desc = do
   buffer <- textViewGetBuffer (guiDkDescription dkp)
   textBufferSetText buffer desc
+
+enableDkMetaData :: DrumkitPage -> Bool -> IO ()
+enableDkMetaData dkp val = do
+  widgetSetSensitive (guiMetaVersion dkp)     val
+  widgetSetSensitive (guiMetaTitle dkp)       val
+  widgetSetSensitive (guiMetaLogo dkp)        val
+  widgetSetSensitive (guiMetaDescription dkp) val
+  widgetSetSensitive (guiMetaLicense dkp)     val
+  widgetSetSensitive (guiMetaNotes dkp)       val
+  widgetSetSensitive (guiMetaAuthor dkp)      val
+  widgetSetSensitive (guiMetaEMail dkp)       val
+  widgetSetSensitive (guiMetaWebSite dkp)     val
+
+
+setDkMetaData :: DrumkitPage -> Maybe MetaData -> IO ()
+setDkMetaData dkp Nothing  = enableDkMetaData dkp False
+setDkMetaData dkp (Just m) = do
+  enableDkMetaData dkp True
+  entrySetText (guiMetaVersion dkp) $ fromMaybe "" (metaVersion m)
+  entrySetText (guiMetaTitle dkp) $ fromMaybe "" (metaTitle m)
+  entrySetText (guiMetaLogo dkp) $ fromMaybe "" (metaLogo m)
+  entrySetText (guiMetaAuthor dkp) $ fromMaybe "" (metaAuthor m)
+  entrySetText (guiMetaEMail dkp) $ fromMaybe "" (metaEMail m)
+  entrySetText (guiMetaWebSite dkp) $ fromMaybe "" (metaWebsite m)
+
+  textViewGetBuffer (guiMetaDescription dkp) >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaDescription m)
+  textViewGetBuffer (guiMetaLicense dkp) >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaLicense m)
+  textViewGetBuffer (guiMetaNotes dkp) >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaNotes m)
+
 
 
 
@@ -424,6 +497,7 @@ setDrumkit gui dk = do
   writeIORef (guiDrumkit gui) (Just dk)
   widgetSetSensitive (guiBtCompileGM gui)  True
   widgetSetSensitive (guiBtCompileDef gui) True
+  setDkMetaData gui (dkMeta dk)
 
 
 clearDrumkit :: DrumkitPage -> IO ()
@@ -431,7 +505,8 @@ clearDrumkit gui = do
   writeIORef (guiDrumkit gui) Nothing
   widgetSetSensitive (guiBtCompileGM gui)  False
   widgetSetSensitive (guiBtCompileDef gui) False
-
+  setDkMetaData gui (Just clearMetadata)
+  
 
 getDrumkit :: DrumkitPage -> IO (Maybe Drumkit)
 getDrumkit gui = do
@@ -466,14 +541,14 @@ importDrumDropsDrumKit' gui = do
       instFiles <- doImport basedir samplesDir dirs
 
       let errs = lefts instFiles
-      case null errs of
-        False -> do
+      if not (null errs)
+        then do
           displayMultiErrors
             (guiErrDiag gui)
             "Multiple errors happened during Import of Instruments:"
             errs
           return ()
-        True -> do
+        else do
           let
             insts :: [(InstrumentFile, Int)]
             insts      = rights instFiles
@@ -562,7 +637,7 @@ importDrumDropsDrumKit' gui = do
   yield = do
     i <- eventsPending
     when (i > 0) $ do
-      void $ mainIteration
+      void mainIteration
       yield
 
 
@@ -579,7 +654,7 @@ getDirectoriesToImport path = do
   filterP = extension ==? ".wav"
 
 
-initTvChannels :: TreeView -> ListStore Text -> IO (CellRendererText)
+initTvChannels :: TreeView -> ListStore Text -> IO CellRendererText
 initTvChannels tv ls = do
   treeViewSetModel tv (Just ls)
 
@@ -616,10 +691,10 @@ initTvChannels tv ls = do
 
 
 setChannels :: DrumkitPage -> [Text] -> IO ()
-setChannels gui channels = setListStoreTo (guiTvChannelsModel gui) channels
+setChannels gui = setListStoreTo (guiTvChannelsModel gui)
 
 
-initTvInstruments :: TreeView -> ListStore ChannelMap -> IO (CellRendererText)
+initTvInstruments :: TreeView -> ListStore ChannelMap -> IO CellRendererText
 initTvInstruments tv ls = do
   treeViewSetModel tv (Just ls)
 
@@ -650,7 +725,7 @@ initTvInstruments tv ls = do
     , cellTextBackgroundSet := cmContainsUndefined cm
     ]
   cellLayoutSetAttributes col2 renderer2 ls $ \cm ->
-    [ cellText := maybe "--" id (cmGroup cm)
+    [ cellText := fromMaybe "--" (cmGroup cm)
     , cellTextBackgroundColor := yellow
     , cellTextBackgroundSet := cmContainsUndefined cm
     ]
@@ -711,7 +786,7 @@ initTvChannelMap tv lsMicros ls lsinst ref = do
     cont <- readIORef ref
     case cont of
       Just (idx, _) -> do
-        cmap <- listStoreGetValue lsinst idx 
+        cmap <- listStoreGetValue lsinst idx
         let !newCmap = channelMapUpdateMain cmap i ena
         listStoreSetValue lsinst idx newCmap
       Nothing -> return ()
@@ -865,14 +940,14 @@ mapInsts gui f = do
 exportDrumKit :: DrumkitPage -> IO ()
 exportDrumKit gui = do
   basepath <- entryGetText (guiBaseDir gui)
-  case null basepath of
-    True  -> displayErrorBox (guiDkParentWindow gui) "No basepath specified!"
-    False -> do
+  if null basepath
+    then displayErrorBox (guiDkParentWindow gui) "No basepath specified!"
+    else do
       nm <- getDkName gui
-      case T.null nm of
-        True ->
-          displayErrorBox (guiDkParentWindow gui) "No drumkit name specified!"
-        False -> withFileHandlingDialog (guiFhDialog gui) $ do
+      if T.null nm
+        then displayErrorBox (guiDkParentWindow gui)
+                             "No drumkit name specified!"
+        else withFileHandlingDialog (guiFhDialog gui) $ do
           writeDrumKitFile gui nm basepath
                             -- get the midi map and write it
                             --gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
@@ -940,7 +1015,7 @@ saveDrumkit gui = do
   let parentWindow = guiDkParentWindow gui
 
   dialog <- fileChooserDialogNew
-    (Just $ ("Save Drumkit File" :: Text))             --dialog title
+    (Just ("Save Drumkit File" :: Text))             --dialog title
     (Just parentWindow)                     --the parent window
     FileChooserActionSave                         --the kind of dialog we want
     [ ( "gtk-cancel"                                --The buttons to display
@@ -970,7 +1045,7 @@ saveDrumkit gui = do
                 channels <- listStoreToList (guiTvChannelsModel gui)
                 insts    <- listStoreToList (guiTvInstrumentsModel gui)
                 desc     <- getDkDescription gui
-                let d' = d { dkName        = (T.pack nm)
+                let d' = d { dkName        = T.pack nm
                            , dkDescription = desc
                            , dkChannels    = channels
                            , dkInstruments = insts
@@ -1113,7 +1188,7 @@ loadDrumkit :: DrumkitPage -> IO ()
 loadDrumkit gui = do
   let parentWindow = guiDkParentWindow gui
   dialog <- fileChooserDialogNew
-    (Just $ ("Load a Drumkit" :: Text))             --dialog title
+    (Just ("Load a Drumkit" :: Text))             --dialog title
     (Just parentWindow)                     --the parent window
     FileChooserActionOpen                         --the kind of dialog we want
     [ ( "gtk-cancel"                                --The buttons to display
@@ -1196,7 +1271,7 @@ loadInstrumentFiles gui path files = do
                               name
     instrumentPageInsert ins
     instrumentPageSetInstrumentName ins name
-    instrumentPageLoadFile ins (path </> (cmFile cm))
+    instrumentPageLoadFile ins (path </> cmFile cm)
 
 
 -- Can't do it this way, as the channel mapping must be unique. What we got this
@@ -1338,7 +1413,7 @@ channelUp gui = do
       let ls = guiTvChannelsModel gui
       ch <- listStoreGetValue ls i
       listStoreRemove ls i
-      let idx = if i > 0 then (i - 1) else 0
+      let idx = if i > 0 then i - 1 else 0
       listStoreInsert ls idx ch
       activateRow (guiTvChannels gui) idx
     _ -> return ()
@@ -1353,7 +1428,7 @@ channelDown gui = do
       let ls = guiTvChannelsModel gui
       ch <- listStoreGetValue ls i
       listStoreRemove ls i
-      let idx = (i + 1)
+      let idx = i + 1
       listStoreInsert ls idx ch
       activateRow (guiTvChannels gui) idx
     _ -> return ()

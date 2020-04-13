@@ -13,9 +13,47 @@ import           Text.Parsec                   as P
 import           Data.List                      ( sortOn )
 import qualified Data.IntMap.Strict            as M
 
+
+data MetaData = MetaData {
+  metaVersion :: Maybe Text
+  , metaTitle :: Maybe Text
+  , metaLogo :: Maybe Text
+  , metaDescription :: Maybe Text
+  , metaLicense :: Maybe Text
+  , metaNotes :: Maybe Text
+  , metaAuthor :: Maybe Text
+  , metaEMail :: Maybe Text
+  , metaWebsite :: Maybe Text
+  } deriving (Show)
+
+
+emptyMetaData :: MetaData
+emptyMetaData = MetaData Nothing
+                         Nothing
+                         Nothing
+                         Nothing
+                         Nothing
+                         Nothing
+                         Nothing
+                         Nothing
+                         Nothing
+
+clearMetaData :: MetaData
+clearMetaData = MetaData (Just "")
+                         (Just "")
+                         (Just "")
+                         (Just "")
+                         (Just "")
+                         (Just "")
+                         (Just "")
+                         (Just "")
+                         (Just "")
+
+
 data Drumkit = Drumkit {
     dkName :: !Text,
     dkDescription :: !Text,
+    dkMeta :: Maybe MetaData,
     dkSampleRate :: Maybe Text,
     dkChannels :: [Text],
     dkInstruments :: [ChannelMap]
@@ -271,7 +309,7 @@ instance Eq Microphones where
 micParser :: Parsec Text u Microphones
 micParser =
   do
-      (try (string "KickC") >> return KickC)
+      try (string "KickC") >> return KickC
     <|> (try (string "KickL") >> return KickL)
     <|> (try (string "KickR") >> return KickR)
     <|> (try (string "KickS") >> return KickS)
@@ -331,7 +369,7 @@ validateMic txt = case parse micParser "" txt of
 generateDrumkit :: Text -> Text -> Maybe Text -> [InstrumentFile] -> Drumkit
 generateDrumkit name description samplerate ifl = res
  where
-  res       = Drumkit name description samplerate channels chanMap
+  res       = Drumkit name description Nothing samplerate channels chanMap
   channels' = getAvailableChannels ifl
   channels  = toAscList channels'
 
@@ -451,7 +489,7 @@ cmChangeChannel oldName newName cm = cm { cmMap = chans }
     | otherwise       = x
 
 cmCheckUndefined :: Vector ChannelMapItem -> Bool
-cmCheckUndefined = elem True . V.map ((== (pack (show Undefined))) . cmiOut)
+cmCheckUndefined = or . V.map ((== pack (show Undefined)) . cmiOut)
 
 cmUpdateIfUndefined :: ChannelMap -> ChannelMap
 cmUpdateIfUndefined cm = newCm
