@@ -10,6 +10,22 @@ In contrast, DGPatchMaker is designed for creating DrumGizmo patches from existi
 
 This is not as trivial as it sounds, as every sample library is structured differently and needs to be fit into DrumGizmos model.
 
+## Functionality 
+
+Following functionality is NOT YET supported:
+ 
+ * Clicky Kit / Image Maps 
+ * Directed Chokes
+ * Improved Metadata (in work)
+ 
+What is supported: 
+
+ * Instruments, hits, sample selection, calculation of hit power (same as DGEdit), also loading and saving individual instruments
+ * Creation of the drumkit patch from the created instruments
+ * mute groups (old ones, not directed chokes) 
+ * channel selections and routing
+ * GM and default MIDI map creation in XML and also in readable text format for reference
+
 ## Download 
 
 Version 1.0 (compiled on Ubuntu 18.04 x86_64): [DGPatchMaker 1.0](https://www.onikudaki.net/blog/wp-content/uploads/2020/04/DGPatchMaker.zip)
