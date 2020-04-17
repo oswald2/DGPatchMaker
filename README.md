@@ -28,7 +28,7 @@ What is supported:
 
 ## Download 
 
-Version 1.0 (compiled on Ubuntu 18.04 x86_64): [DGPatchMaker 1.0](https://www.onikudaki.net/blog/wp-content/uploads/2020/04/DGPatchMaker.zip)
+Version 1.0 (compiled on Ubuntu 18.04 x86_64): [DGPatchMaker 1.0](https://www.onikudaki.net/blog/wp-content/uploads/2020/04/DGPatchMaker-2.zip)
 
 ## Git Clone
 
