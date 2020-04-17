@@ -10,6 +10,36 @@ In contrast, DGPatchMaker is designed for creating DrumGizmo patches from existi
 
 This is not as trivial as it sounds, as every sample library is structured differently and needs to be fit into DrumGizmos model.
 
+## Functionality 
+
+Following functionality is NOT YET supported:
+ 
+ * Clicky Kit / Image Maps 
+ * Directed Chokes
+ * Improved Metadata (in work)
+ 
+What is supported: 
+
+ * Instruments, hits, sample selection, calculation of hit power (same as DGEdit), also loading and saving individual instruments
+ * Creation of the drumkit patch from the created instruments
+ * mute groups (old ones, not directed chokes) 
+ * channel selections and routing
+ * GM and default MIDI map creation in XML and also in readable text format for reference
+
+## Download 
+
+Version 1.0 (compiled on Ubuntu 18.04 x86_64): [DGPatchMaker 1.0](https://www.onikudaki.net/blog/wp-content/uploads/2020/04/DGPatchMaker-2.zip)
+
+## Git Clone
+
+When cloning the repository, make sure to checkout the stable versions afterwards. Currently version 1.0 is the latest, so do a 
+
+```
+git clone https://github.com/oswald2/DGPatchMaker
+git checkout 1.0
+```
+
+
 ## Building 
 
 Best option currently is to use the Haskell tool [stack](https://docs.haskellstack.org/). Download and install stack as detailed on the stack homepage.
@@ -132,26 +162,4 @@ The manual workflow consists of the following steps:
  4. Export the drumkit 
  5. Export the MIDI-Map
 
-### Create the Instruments
-
-
- 1. In DGPatchMaker click on the "Instruments" tag.
- 2. Click on the button "New Instrument". A new tab-page appears where the instrument can be defined. The "Samples" field is for the WAV files from the sample library, the "Hits" are then assigned to the samples
- 3. First, give the instrument a name in the "Name" field (e.g. "Kick left"). The name is immediately reflected in the tab-label also.
- 4. Specify a "Type". This is the type of drum used. Currently possible values:
-
-   * `Kick`
-   * `Snare`
-   * `HiHat`
-   * `Tom <TomType>` where *TomType* is either `RackTom <n>` where n is a number 1..5 or `Floor <n>` where n is a number 1..3. Note that these types have to be one field and have to be put into parenthesis to match this (e.g. "Tom (RackTom 1)")
-   * `Cymbal`
-   * `Ride`
-   * `Shaker`
-   * `Tambourine`
-
- If you enter an illegal type, DGPatchMaker will tell you the allowed values for this field 
- 
- 5. Enter a "Filename" for the generated XML output file in the DrumGizmo patch. Note that this can be different to the instrument name.
- 6. Load the samples for this instrument. 
-
-*To be continued...*
+In order to show the usage, I created a video which demonstrates the basic usage of DGPatchMaker: [How to use DGPatchMaker to create a patch](https://youtu.be/u1fcU8DzxFs)
