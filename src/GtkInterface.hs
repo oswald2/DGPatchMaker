@@ -48,6 +48,9 @@ initMainWindow = do
     buttonNewInstrument <- builderGetObject builder
                                             castToButton
                                             ("buttonNewInstrument" :: Text)
+    buttonRemoveInstrument <- builderGetObject builder
+                                            castToButton
+                                            ("buttonRemoveInstrument" :: Text)
     entryBaseDirectory <- builderGetObject builder
                                            castToEntry
                                            ("entryBaseDirectory" :: Text)
@@ -105,6 +108,12 @@ initMainWindow = do
         instrumentPageInsert ins
         notebookSetCurrentPage notebookInstruments i
         instrumentPageSetInstrumentName ins name
+
+    void $ on buttonRemoveInstrument buttonActivated $ do 
+        i <- notebookGetCurrentPage notebookInstruments
+        modifyIORef' instPages $ V.ifilter (\ix _ -> ix /= i)
+        notebookRemovePage notebookInstruments i   
+
 
     -- set termination
     void $ window `on` deleteEvent $ liftIO quit

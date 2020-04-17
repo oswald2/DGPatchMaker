@@ -347,6 +347,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     void $ G.on btDown buttonActivated $ channelDown gui
     void $ G.on btSort buttonActivated $ sortChannels gui
 
+    void $ G.on metaenable toggled $ toggleButtonGetActive metaenable >>= enableDkMetaData gui 
+
     setupCallbacks gui
 
     return gui

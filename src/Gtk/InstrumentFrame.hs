@@ -1197,6 +1197,7 @@ instrumentPageInsert instPage = do
     return ()
 
 
+
 setNotebookCurrentPageLabel :: InstrumentPage -> Text -> IO ()
 setNotebookCurrentPageLabel instPage name = do
     let notebook = guiIPNotebook instPage
