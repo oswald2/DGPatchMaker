@@ -10,6 +10,10 @@ In contrast, DGPatchMaker is designed for creating DrumGizmo patches from existi
 
 This is not as trivial as it sounds, as every sample library is structured differently and needs to be fit into DrumGizmos model.
 
+## Download 
+
+Version 1.0 (compiled on Ubuntu 18.04 x86_64): [DGPatchMaker 1.0](https://www.onikudaki.net/blog/wp-content/uploads/2020/04/DGPatchMaker.zip)
+
 ## Building 
 
 Best option currently is to use the Haskell tool [stack](https://docs.haskellstack.org/). Download and install stack as detailed on the stack homepage.
