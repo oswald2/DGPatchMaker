@@ -5,6 +5,7 @@ module Gtk.Drumkit
   , setDkSampleRate
   , enableDkMetaData
   , setDkMetaData
+  , getDkMetaData
   )
 where
 
@@ -347,7 +348,10 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     void $ G.on btDown buttonActivated $ channelDown gui
     void $ G.on btSort buttonActivated $ sortChannels gui
 
-    void $ G.on metaenable toggled $ toggleButtonGetActive metaenable >>= enableDkMetaData gui 
+    void
+      $   G.on metaenable toggled
+      $   toggleButtonGetActive metaenable
+      >>= enableDkMetaData gui
 
     setupCallbacks gui
 
@@ -415,11 +419,48 @@ setDkMetaData dkp (Just m) = do
   entrySetText (guiMetaEMail dkp) $ fromMaybe "" (metaEMail m)
   entrySetText (guiMetaWebSite dkp) $ fromMaybe "" (metaWebsite m)
 
-  textViewGetBuffer (guiMetaDescription dkp) >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaDescription m)
-  textViewGetBuffer (guiMetaLicense dkp) >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaLicense m)
-  textViewGetBuffer (guiMetaNotes dkp) >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaNotes m)
+  textViewGetBuffer (guiMetaDescription dkp)
+    >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaDescription m)
+  textViewGetBuffer (guiMetaLicense dkp)
+    >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaLicense m)
+  textViewGetBuffer (guiMetaNotes dkp)
+    >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaNotes m)
 
 
+getDkMetaData :: DrumkitPage -> IO (Maybe MetaData)
+getDkMetaData dkp = do
+  ena <- toggleButtonGetActive (guiMetaEnable dkp)
+  if ena
+    then do
+      vers    <- getTxt (guiMetaVersion dkp)
+      title   <- getTxt (guiMetaTitle dkp)
+      logo    <- getTxt (guiMetaLogo dkp)
+      author  <- getTxt (guiMetaAuthor dkp)
+      email   <- getTxt (guiMetaEMail dkp)
+      website <- getTxt (guiMetaWebSite dkp)
+
+      descr   <- getTxtV (guiMetaDescription dkp)
+      license <- getTxtV (guiMetaLicense dkp)
+      notes   <- getTxtV (guiMetaNotes dkp)
+
+      return MetaData { metaVersion     = vers
+                      , metaTitle       = title
+                      , metaLogo        = logo
+                      , metaDescription = descr
+                      , metaLicense     = license
+                      , metaNotes       = notes
+                      , metaAuthor      = author
+                      , metaEMail       = email
+                      , metaWebsite     = website
+                      }
+    else return Nothing
+ where
+  toMaybe txt = if T.null txt then Nothing else Just txt
+  getTxt w = toMaybe <$> entryGetText w
+
+  getTxtV w = do
+    buf <- textViewGetBuffer w
+    toMaybe <$> textBufferGetText buf
 
 
 initParserCombo :: ComboBox -> IO ()
@@ -508,7 +549,7 @@ clearDrumkit gui = do
   widgetSetSensitive (guiBtCompileGM gui)  False
   widgetSetSensitive (guiBtCompileDef gui) False
   setDkMetaData gui (Just clearMetaData)
-  
+
 
 getDrumkit :: DrumkitPage -> IO (Maybe Drumkit)
 getDrumkit gui = do
@@ -1007,6 +1048,37 @@ writeDrumKitFile' gui nm basepath = do
                 -- also export the instrument files
               exportInstruments gui
 
+
+getDrumkitGUI :: DrumkitPage -> IO DrumKit
+getDrumkitGUI gui = do
+  nm      <- getDkName gui
+  drumkit <- getDrumkit gui
+  case drumkit of
+    Just d -> do
+      channels <- listStoreToList (guiTvChannelsModel gui)
+      insts    <- listStoreToList (guiTvInstrumentsModel gui)
+
+      hasMeta  <- toggleButtonGetActive (guiMetaEnable gui)
+      newD <- if hasMeta
+        then do
+          meta <- getDkMetaData gui
+          let
+            d' = d { dkInfo        = Right meta
+                   , dkChannels    = channels
+                   , dkInstruments = insts
+                   }
+        else do
+          desc <- getDkDescription gui
+          let oldDesc = OldDescr nm desc
+          let
+            d' = d { dkInfo        = Left oldDesc
+                   , dkChannels    = channels
+                   , dkInstruments = insts
+                   }
+      setDrumkit gui newD 
+      return newD 
+    Nothing -> do
+      
 
 
 saveDrumkit :: DrumkitPage -> IO ()

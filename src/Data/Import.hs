@@ -18,6 +18,7 @@ import           Text.XML.Stream.Parse
 import           Data.XML.Types
 import qualified Data.Vector                   as V
 import           Data.Either
+import           Data.Maybe
 import           Control.Monad
 import           System.FilePath
 
@@ -39,9 +40,8 @@ instance Exception DKParseException
 
 
 parseMidiNote :: MonadThrow m => ConduitM Event o m (Maybe (Int, Text))
-parseMidiNote =
-  tag' "map" ((,) <$> requireAttr "note" <*> requireAttr "instr")
-    $ \(note, instr) -> return (read (unpack note), instr)
+parseMidiNote = tag' "map" ((,) <$> requireAttr "note" <*> requireAttr "instr")
+  $ \(note, instr) -> return (read (unpack note), instr)
 
 
 parseMidiMap :: MonadThrow m => ConduitM Event o m (Maybe MidiMap)
@@ -118,29 +118,23 @@ importInstrumentFile path = do
     return (maybe (Left "Could not parse file") Right iF)
   handler e = return (Left (dkpeMsg e))
   handler2 XmlException {..} = do
-    let msg =
-          pack xmlErrorMessage
-            `append` "\n\nContext: "
-            `append` pack (show xmlBadInput)
+    let msg = pack xmlErrorMessage `append` "\n\nContext: " `append` pack
+          (show xmlBadInput)
     return (Left msg)
   handler2 e = return (Left (pack (show e)))
 
 
-
 conduitDrumKitXML :: MonadThrow m => ConduitM Event o m (Maybe Drumkit)
 conduitDrumKitXML = do
-  tag'
-      "drumkit"
-      ((,,) <$> requireAttr "name" <*> requireAttr "description" <*> attr
-        "samplerate"
-      )
+  tag' "drumkit"
+       ((,,) <$> attr "name" <*> attr "description" <*> attr "samplerate")
     $ \(name, description, samplerate) -> do
-        meta <- conduitMeta 
+        meta  <- conduitMeta
         chans <- channels
         insts <- instruments
         case (chans, insts) of
-          (Just c, Just i) ->
-            return $ Drumkit name description meta samplerate c i
+          (Just c, Just i) -> return
+            $ generateDrumKit name description meta samplerate c i
           _ -> throwM (DrumkitParseError "Cannot parse drumkit")
  where
   channels    = tagNoAttr "channels" (many ch)
@@ -164,6 +158,21 @@ conduitDrumKitXML = do
     return
 
 
+generateDrumKit
+  :: Maybe Text
+  -> Maybe Text
+  -> Maybe MetaData
+  -> Maybe Text
+  -> [Text]
+  -> [ChannelMap]
+  -> Drumkit
+generateDrumKit name descr (Just meta) samplerate channels instrs =
+  Drumkit (Right meta) samplerate channels instrs
+generateDrumKit name descr Nothing samplerate channels instrs =
+  let oldDescr = OldDescr (fromMaybe "" name) (fromMaybe "" descr)
+  in  Drumkit (Left oldDescr) samplerate channels instrs
+
+
 conduitMeta :: (Monad m, MonadThrow m) => ConduitM Event o m (Maybe MetaData)
 conduitMeta = tagNoAttr "metadata" $ do
   v    <- version
@@ -184,7 +193,7 @@ conduitMeta = tagNoAttr "metadata" $ do
                   , metaLicense     = lic
                   , metaNotes       = n
                   , metaAuthor      = auth
-                  , metaEMail       = em 
+                  , metaEMail       = em
                   , metaWebsite     = ws
                   }
  where
@@ -209,10 +218,8 @@ importDrumkitFile path = do
     return (maybe (Left "Could not parse file") Right iF)
   handler e = return (Left (dkpeMsg e))
   handler2 XmlException {..} = do
-    let msg =
-          pack xmlErrorMessage
-            `append` "\n\nContext: "
-            `append` pack (show xmlBadInput)
+    let msg = pack xmlErrorMessage `append` "\n\nContext: " `append` pack
+          (show xmlBadInput)
     return (Left msg)
   handler2 e = return (Left (pack (show e)))
 

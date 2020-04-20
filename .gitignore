@@ -13,3 +13,4 @@ src/Data/Types.hs.orig
 src/Gtk/.goutputstream-UA6RMY
 cabal.project.local~
 cabal.project.local
+stack.yaml.lock

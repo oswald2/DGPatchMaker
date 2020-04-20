@@ -7,7 +7,7 @@ where
 import Data.Text as T
 import Data.List as L (dropWhileEnd, foldr1)
 import Control.Exception
-import Control.Monad (when)
+import Control.Monad 
 
 import System.FilePath
 import System.Directory
@@ -27,7 +27,7 @@ getInstrumentDir path = getDrumgizmoDir path </> "Instruments"
 
 -- | gets the base path from a drumkit file name
 getBasePath :: FilePath -> FilePath
-getBasePath drumkitFile = (L.foldr1 (</>) . L.dropWhileEnd (== drName) . splitDirectories . takeDirectory) drumkitFile
+getBasePath = L.foldr1 (</>) . L.dropWhileEnd (== drName) . splitDirectories . takeDirectory
 
 
 
@@ -36,11 +36,11 @@ createDrumgizmoDirectories path = do
     catch (do
         let dgPath = getDrumgizmoDir path
         e <- doesDirectoryExist dgPath
-        when (not e) $ createDirectory dgPath
+        unless e $ createDirectory dgPath
 
         let instPath = getInstrumentDir path
         e1 <- doesDirectoryExist instPath
-        when (not e1) $ createDirectory instPath
+        unless e1 $ createDirectory instPath
 
         return (Right ())
         )

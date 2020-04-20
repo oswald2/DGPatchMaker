@@ -50,10 +50,13 @@ clearMetaData = MetaData (Just "")
                          (Just "")
 
 
+data OldDescr = OldDescr {
+  odName :: !Text 
+  , odDescription :: !Text 
+  } deriving(Show)
+
 data Drumkit = Drumkit {
-    dkName :: !Text,
-    dkDescription :: !Text,
-    dkMeta :: Maybe MetaData,
+    dkInfo :: Either OldDescr MetaData,
     dkSampleRate :: Maybe Text,
     dkChannels :: [Text],
     dkInstruments :: [ChannelMap]
@@ -366,10 +369,10 @@ validateMic txt = case parse micParser "" txt of
   Right mic -> Right mic
 
 
-generateDrumkit :: Text -> Text -> Maybe Text -> [InstrumentFile] -> Drumkit
-generateDrumkit name description samplerate ifl = res
+generateDrumkit :: Either OldDescr MetaData -> Maybe Text -> [InstrumentFile] -> Drumkit
+generateDrumkit descr samplerate ifl = res
  where
-  res       = Drumkit name description Nothing samplerate channels chanMap
+  res       = Drumkit descr samplerate channels chanMap
   channels' = getAvailableChannels ifl
   channels  = toAscList channels'
 

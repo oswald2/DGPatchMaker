@@ -138,7 +138,7 @@ executable ParseTest
                        vector,
                        directory,
                        filepath,
-                       parsec3,
+                       parsec,
                        xmlgen,
                        bytestring,
                        hsndfile,

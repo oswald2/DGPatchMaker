@@ -9,7 +9,7 @@ where
 
 
 import           Data.Monoid                    ( (<>) )
-import           Data.Text                      ( pack )
+import           Data.Text                      ( Text, pack )
 import qualified Data.Text.Lazy                as L
 import           Data.Text.Lazy.Builder        as L
 import           Data.Text.Lazy.Builder.Int    as L
@@ -93,15 +93,23 @@ writeMidiMapXML mp filename = do
     C..| C.sinkFile filename
 
 
+dkName :: Drumkit -> Maybe Text 
+dkName Drumkit { dkInfo = Left descr } = Just (odName descr)
+dkName _ = Nothing 
+
+dkDescription :: Drumkit -> Maybe Text 
+dkDescription Drumkit { dkInfo = Left descr } = Just (odDescription descr)
+dkDescription _ = Nothing 
+
 
 conduitDrumKitXML :: Monad m => Drumkit -> ConduitT () Event m ()
 conduitDrumKitXML dr = tag
   "drumkit"
-  (  attr "name"        (dkName dr)
-  <> attr "description" (dkDescription dr)
-  <> optionalAttr "samplerate" (dkSampleRate dr)
+  (  optionalAttr "name"        (dkName dr)
+  <> optionalAttr "description" (dkDescription dr)
+  <> optionalAttr "samplerate"  (dkSampleRate dr)
   )
-  (metadata (dkMeta dr) <> channels <> instruments)
+  (metadata (dkInfo dr) <> channels <> instruments)
  where
 
   channels = tag "channels" mempty (foldr ch mempty (dkChannels dr))
@@ -125,9 +133,9 @@ conduitDrumKitXML dr = tag
     else tag "channelmap" (attr "in" c1 <> attr "out" c2) mempty <> b
 
 
-metadata :: Monad m => Maybe MetaData -> ConduitT () Event m ()
-metadata Nothing  = mempty
-metadata (Just m) = tag
+metadata :: Monad m => Either OldDescr MetaData -> ConduitT () Event m ()
+metadata (Left _)  = mempty
+metadata (Right m) = tag
   "metadata"
   mempty
   (  version 
