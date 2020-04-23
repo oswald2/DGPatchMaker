@@ -77,6 +77,11 @@ listStoreIMap ls f = do
     go 0                 
 
 
+textViewGetText :: TextView -> IO Text
+textViewGetText tv = do
+  buffer       <- textViewGetBuffer tv
+  (start, end) <- textBufferGetBounds buffer
+  textBufferGetText buffer start end False
 
 
 activateRow :: TreeView -> Int -> IO ()

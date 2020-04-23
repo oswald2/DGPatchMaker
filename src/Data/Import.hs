@@ -19,7 +19,6 @@ import           Data.XML.Types
 import qualified Data.Vector                   as V
 import           Data.Either
 import           Data.Maybe
-import           Control.Monad
 import           System.FilePath
 
 import           Control.Monad.Trans.Resource
@@ -133,29 +132,52 @@ conduitDrumKitXML = do
         chans <- channels
         insts <- instruments
         case (chans, insts) of
-          (Just c, Just i) -> return
-            $ generateDrumKit name description meta samplerate c i
+          (Just c, Just i) ->
+            return $ generateDrumKit name description meta samplerate c i
           _ -> throwM (DrumkitParseError "Cannot parse drumkit")
  where
   channels    = tagNoAttr "channels" (many ch)
   ch          = tag' "channel" (requireAttr "name") return
-  instruments = tagNoAttr "instruments" (many ins)
-  ins =
-    tag' "instrument"
-         ((,,) <$> requireAttr "name" <*> attr "group" <*> requireAttr "file")
-      $ \(name, group, file) -> do
-          cm' <- many channelmap
-          let cm = V.fromList $ map mkChannelMapItemTuple cm'
-          return $ ChannelMap name
-                              group
-                              (unpack file)
-                              Nothing
-                              cm
-                              (cmCheckUndefined cm)
+  instruments = tagNoAttr "instruments" (many instrumentData)
+
+
+
+instrumentData
+  :: (Monad m, MonadThrow m) => ConduitM Event o m (Maybe ChannelMap)
+instrumentData =
+  tag' "instrument"
+       ((,,) <$> requireAttr "name" <*> attr "group" <*> requireAttr "file")
+    $ \(name, group, file) -> do
+        chokes <- chokeData
+        cm'    <- many channelmap
+        let cm = V.fromList $ map mkChannelMapItemTuple cm'
+        return $ ChannelMap name
+                            group
+                            (unpack file)
+                            Nothing
+                            cm
+                            (cmCheckUndefined cm)
+                            (fromMaybe [] chokes)
+ where
   channelmap = tag'
     "channelmap"
     ((,,) <$> requireAttr "in" <*> requireAttr "out" <*> attr "main")
     return
+
+
+chokeData :: (Monad m, MonadThrow m) => ConduitM Event o m (Maybe [ChokeData])
+chokeData = tagNoAttr "chokes" $ many chokes
+ where
+  chokes =
+    tag' "choke" ((,) <$> requireAttr "instrument" <*> requireAttr "choketime")
+      $ \(instr, t) -> case signed decimal t of
+          Left err -> throwM
+            (DrumkitParseError
+              ("Error parsing choke: " <> t <> " is not an integer with:" <> (pack err)
+              )
+            )
+          Right (time, _) -> return $ ChokeData instr time
+
 
 
 generateDrumKit
@@ -166,7 +188,7 @@ generateDrumKit
   -> [Text]
   -> [ChannelMap]
   -> Drumkit
-generateDrumKit name descr (Just meta) samplerate channels instrs =
+generateDrumKit _name _descr (Just meta) samplerate channels instrs =
   Drumkit (Right meta) samplerate channels instrs
 generateDrumKit name descr Nothing samplerate channels instrs =
   let oldDescr = OldDescr (fromMaybe "" name) (fromMaybe "" descr)
@@ -184,7 +206,7 @@ conduitMeta = tagNoAttr "metadata" $ do
   auth <- author
   em   <- email
   ws   <- website
-  void image
+  _im  <- imageData
 
   return MetaData { metaVersion     = v
                   , metaTitle       = t
@@ -206,7 +228,22 @@ conduitMeta = tagNoAttr "metadata" $ do
   author      = tagNoAttr "author" content
   email       = tagNoAttr "email" content
   website     = tagNoAttr "website" content
-  image       = tagIgnoreAttrs "image" content
+
+
+imageData :: (Monad m, MonadThrow m) => ConduitM Event o m (Maybe ImageData)
+imageData =
+  tag' "image" ((,) <$> requireAttr "src" <*> requireAttr "map")
+    $ \(src, mapImg) -> do
+        items <- many clickMapItem
+        return (ImageData src mapImg items)
+
+clickMapItem
+  :: (Monad m, MonadThrow m) => ConduitM Event o m (Maybe ClickMapItem)
+clickMapItem =
+  tag' "clickmap"
+       (ClickMapItem <$> requireAttr "colour" <*> requireAttr "instrument")
+    $ \item -> return item
+
 
 
 importDrumkitFile :: FilePath -> IO (Either Text Drumkit)

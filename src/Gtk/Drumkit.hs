@@ -3,7 +3,6 @@ module Gtk.Drumkit
   ( DrumkitPage
   , initDrumkitPage
   , setDkSampleRate
-  , enableDkMetaData
   , setDkMetaData
   , getDkMetaData
   )
@@ -44,7 +43,7 @@ import           Data.IORef
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as S
 --import           Data.Checkers
---import           Data.Defaults
+import           Data.Defaults
 
 
 import           Graphics.UI.Gtk               as G
@@ -99,7 +98,8 @@ data DrumkitPage = DrumkitPage {
     guiMetaAuthor :: Entry,
     guiMetaEMail :: Entry,
     guiMetaWebSite :: Entry,
-    guiMetaEnable :: CheckButton
+    guiMetaEnable :: CheckButton,
+    guiMetaNotebook :: Notebook
 }
 
 
@@ -188,6 +188,10 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     ewebsite <- builderGetObject builder
                                  castToEntry
                                  ("entryMetaWebsite" :: Text)
+
+    metaNotebook <- builderGetObject builder
+                                     castToNotebook
+                                     ("notebookMetaData" :: Text)
 
     lsm             <- listStoreNew []
     lsinst          <- listStoreNew []
@@ -315,6 +319,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
                           , guiMetaEMail             = eemail
                           , guiMetaWebSite           = ewebsite
                           , guiMetaEnable            = metaenable
+                          , guiMetaNotebook          = metaNotebook
                           }
     --setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
     setDkDescription gui ""
@@ -348,10 +353,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     void $ G.on btDown buttonActivated $ channelDown gui
     void $ G.on btSort buttonActivated $ sortChannels gui
 
-    void
-      $   G.on metaenable toggled
-      $   toggleButtonGetActive metaenable
-      >>= enableDkMetaData gui
+    void $ G.on metaenable toggled $ do
+      ena <- toggleButtonGetActive metaenable
+      notebookSetCurrentPage metaNotebook (if ena then 1 else 0)
 
     setupCallbacks gui
 
@@ -372,15 +376,11 @@ getDkDescription dkp = do
 getDkSampleRateText :: DrumkitPage -> IO Text
 getDkSampleRateText dkp = entryGetText (guiDkSampleRate dkp)
 
--- getDkSampleRate :: DrumkitPage -> IO Int
--- getDkSampleRate dkp = do
---   sr <- entryGetText (guiDkSampleRate dkp)
---   if T.null sr
---     then return defaultSampleRate
---     else case checkSampleRate sr of
---       Left err ->
---         displayErrorBox (guiDkParentWindow dkp) err >> return defaultSampleRate
---       Right x -> pure x
+getDkSampleRate :: DrumkitPage -> IO Int
+getDkSampleRate dkp = do
+  sr <- entryGetText (guiDkSampleRate dkp)
+  if T.null sr then return defaultSampleRate else return (read (T.unpack sr))
+
 
 setDkSampleRate :: DrumkitPage -> Int -> IO ()
 setDkSampleRate dkp sr = entrySetText (guiDkSampleRate dkp) (T.pack (show sr))
@@ -395,23 +395,24 @@ setDkDescription dkp desc = do
   buffer <- textViewGetBuffer (guiDkDescription dkp)
   textBufferSetText buffer desc
 
-enableDkMetaData :: DrumkitPage -> Bool -> IO ()
-enableDkMetaData dkp val = do
-  widgetSetSensitive (guiMetaVersion dkp)     val
-  widgetSetSensitive (guiMetaTitle dkp)       val
-  widgetSetSensitive (guiMetaLogo dkp)        val
-  widgetSetSensitive (guiMetaDescription dkp) val
-  widgetSetSensitive (guiMetaLicense dkp)     val
-  widgetSetSensitive (guiMetaNotes dkp)       val
-  widgetSetSensitive (guiMetaAuthor dkp)      val
-  widgetSetSensitive (guiMetaEMail dkp)       val
-  widgetSetSensitive (guiMetaWebSite dkp)     val
+-- enableDkMetaData :: DrumkitPage -> Bool -> IO ()
+-- enableDkMetaData dkp val = do
+--   widgetSetSensitive (guiMetaVersion dkp)     val
+--   widgetSetSensitive (guiMetaTitle dkp)       val
+--   widgetSetSensitive (guiMetaLogo dkp)        val
+--   widgetSetSensitive (guiMetaDescription dkp) val
+--   widgetSetSensitive (guiMetaLicense dkp)     val
+--   widgetSetSensitive (guiMetaNotes dkp)       val
+--   widgetSetSensitive (guiMetaAuthor dkp)      val
+--   widgetSetSensitive (guiMetaEMail dkp)       val
+--   widgetSetSensitive (guiMetaWebSite dkp)     val
 
 
 setDkMetaData :: DrumkitPage -> Maybe MetaData -> IO ()
-setDkMetaData dkp Nothing  = enableDkMetaData dkp False
+setDkMetaData dkp Nothing  = do 
+  toggleButtonSetActive (guiMetaEnable dkp) False   
 setDkMetaData dkp (Just m) = do
-  enableDkMetaData dkp True
+  toggleButtonSetActive (guiMetaEnable dkp) True
   entrySetText (guiMetaVersion dkp) $ fromMaybe "" (metaVersion m)
   entrySetText (guiMetaTitle dkp) $ fromMaybe "" (metaTitle m)
   entrySetText (guiMetaLogo dkp) $ fromMaybe "" (metaLogo m)
@@ -427,40 +428,34 @@ setDkMetaData dkp (Just m) = do
     >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaNotes m)
 
 
-getDkMetaData :: DrumkitPage -> IO (Maybe MetaData)
+getDkMetaData :: DrumkitPage -> IO MetaData
 getDkMetaData dkp = do
-  ena <- toggleButtonGetActive (guiMetaEnable dkp)
-  if ena
-    then do
-      vers    <- getTxt (guiMetaVersion dkp)
-      title   <- getTxt (guiMetaTitle dkp)
-      logo    <- getTxt (guiMetaLogo dkp)
-      author  <- getTxt (guiMetaAuthor dkp)
-      email   <- getTxt (guiMetaEMail dkp)
-      website <- getTxt (guiMetaWebSite dkp)
+  vers    <- getTxt (guiMetaVersion dkp)
+  title   <- getTxt (guiMetaTitle dkp)
+  logo    <- getTxt (guiMetaLogo dkp)
+  author  <- getTxt (guiMetaAuthor dkp)
+  email   <- getTxt (guiMetaEMail dkp)
+  website <- getTxt (guiMetaWebSite dkp)
 
-      descr   <- getTxtV (guiMetaDescription dkp)
-      license <- getTxtV (guiMetaLicense dkp)
-      notes   <- getTxtV (guiMetaNotes dkp)
+  descr   <- getTxtV (guiMetaDescription dkp)
+  license <- getTxtV (guiMetaLicense dkp)
+  notes   <- getTxtV (guiMetaNotes dkp)
 
-      return MetaData { metaVersion     = vers
-                      , metaTitle       = title
-                      , metaLogo        = logo
-                      , metaDescription = descr
-                      , metaLicense     = license
-                      , metaNotes       = notes
-                      , metaAuthor      = author
-                      , metaEMail       = email
-                      , metaWebsite     = website
-                      }
-    else return Nothing
+  return MetaData { metaVersion     = vers
+                  , metaTitle       = title
+                  , metaLogo        = logo
+                  , metaDescription = descr
+                  , metaLicense     = license
+                  , metaNotes       = notes
+                  , metaAuthor      = author
+                  , metaEMail       = email
+                  , metaWebsite     = website
+                  }
  where
   toMaybe txt = if T.null txt then Nothing else Just txt
   getTxt w = toMaybe <$> entryGetText w
 
-  getTxtV w = do
-    buf <- textViewGetBuffer w
-    toMaybe <$> textBufferGetText buf
+  getTxtV w = toMaybe <$> textViewGetText w 
 
 
 initParserCombo :: ComboBox -> IO ()
@@ -540,7 +535,6 @@ setDrumkit gui dk = do
   writeIORef (guiDrumkit gui) (Just dk)
   widgetSetSensitive (guiBtCompileGM gui)  True
   widgetSetSensitive (guiBtCompileDef gui) True
-  setDkMetaData gui (dkMeta dk)
 
 
 clearDrumkit :: DrumkitPage -> IO ()
@@ -599,11 +593,9 @@ importDrumDropsDrumKit' gui = do
               then 44100
               else let (_, sr) = Prelude.head insts in sr
               --sampleRate = 44100
-          nm   <- getDkName gui
-          desc <- getDkDescription gui
+          info <- getInfo gui 
 
-          let drumkit = generateDrumkit nm
-                                        desc
+          let drumkit = generateDrumkit info
                                         (Just (T.pack (show sampleRate)))
                                         (map fst insts)
 
@@ -1018,48 +1010,32 @@ writeDrumKitFile' gui nm basepath = do
     Left err ->
       displayErrorBox (guiDkParentWindow gui) ("Error during export: " <> err)
     Right () -> do
-      desc    <- getDkDescription gui
+      drumkit <- getDrumkitGUI gui
+      basedir  <- entryGetText (guiBaseDir gui)
+      let dgPath       = getDrumgizmoDir basedir
+          drumkitFName = dgPath </> T.unpack nm <.> ".xml"
 
-      -- read the drumkit from the IORef
-      drumkit <- getDrumkit gui
+      setDrumkit gui drumkit
 
-      case drumkit of
-        Nothing -> return ()
-        Just d  -> do
-          channels <- listStoreToList (guiTvChannelsModel gui)
-          insts    <- listStoreToList (guiTvInstrumentsModel gui)
-          basedir  <- entryGetText (guiBaseDir gui)
-          let d' = d { dkName        = nm
-                     , dkDescription = desc
-                     , dkChannels    = channels
-                     , dkInstruments = insts
-                     }
-              dgPath       = getDrumgizmoDir basedir
-              drumkitFName = dgPath </> T.unpack nm <.> ".xml"
-
-          setDrumkit gui d'
-
-          res <-
-            askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName
-              $ writeDrumKitXML d' drumkitFName
-          case res of
-            Left  err -> displayErrorBox (guiDkParentWindow gui) err
-            Right _   -> do
-                -- also export the instrument files
-              exportInstruments gui
+      res <-
+        askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName
+          $ writeDrumKitXML drumkit drumkitFName
+      case res of
+        Left  err -> displayErrorBox (guiDkParentWindow gui) err
+        Right _   -> do
+            -- also export the instrument files
+          exportInstruments gui
 
 
-getDrumkitGUI :: DrumkitPage -> IO DrumKit
+getDrumkitGUI :: DrumkitPage -> IO Drumkit
 getDrumkitGUI gui = do
-  nm      <- getDkName gui
-  drumkit <- getDrumkit gui
+  drumkit  <- getDrumkit gui
+  channels <- listStoreToList (guiTvChannelsModel gui)
+  insts    <- listStoreToList (guiTvInstrumentsModel gui)
+  hasMeta  <- toggleButtonGetActive (guiMetaEnable gui)
   case drumkit of
     Just d -> do
-      channels <- listStoreToList (guiTvChannelsModel gui)
-      insts    <- listStoreToList (guiTvInstrumentsModel gui)
-
-      hasMeta  <- toggleButtonGetActive (guiMetaEnable gui)
-      newD <- if hasMeta
+      if hasMeta
         then do
           meta <- getDkMetaData gui
           let
@@ -1067,18 +1043,39 @@ getDrumkitGUI gui = do
                    , dkChannels    = channels
                    , dkInstruments = insts
                    }
+          return d'
         else do
+          nm   <- getDkName gui
           desc <- getDkDescription gui
-          let oldDesc = OldDescr nm desc
           let
-            d' = d { dkInfo        = Left oldDesc
-                   , dkChannels    = channels
-                   , dkInstruments = insts
-                   }
-      setDrumkit gui newD 
-      return newD 
+            oldDesc = OldDescr nm desc
+            d'      = d { dkInfo        = Left oldDesc
+                        , dkChannels    = channels
+                        , dkInstruments = insts
+                        }
+          return d'
     Nothing -> do
-      
+      if hasMeta
+        then do
+          meta <- getDkMetaData gui
+          sr   <- getDkSampleRate gui
+          let d = Drumkit { dkInfo        = Right meta
+                          , dkSampleRate  = (Just (T.pack (show sr)))
+                          , dkChannels    = channels
+                          , dkInstruments = insts
+                          }
+          return d
+        else do
+          nm   <- getDkName gui
+          desc <- getDkDescription gui
+          sr   <- getDkSampleRate gui 
+          let oldDesc = OldDescr nm desc
+              d       = Drumkit { dkInfo        = Left oldDesc
+                                , dkSampleRate  = (Just (T.pack (show sr)))
+                                , dkChannels    = channels
+                                , dkInstruments = insts
+                                }
+          return d
 
 
 saveDrumkit :: DrumkitPage -> IO ()
@@ -1112,30 +1109,17 @@ saveDrumkit gui = do
       case (nam, bp) of
         (Just name, Just dir) -> do
           withFileHandlingDialog (guiFhDialog gui) $ do
-            drumkit <- getDrumkit gui
-            case drumkit of
-              Nothing -> return ()
-              Just d  -> do
-                channels <- listStoreToList (guiTvChannelsModel gui)
-                insts    <- listStoreToList (guiTvInstrumentsModel gui)
-                desc     <- getDkDescription gui
-                let d' = d { dkName        = T.pack nm
-                           , dkDescription = desc
-                           , dkChannels    = channels
-                           , dkInstruments = insts
-                           }
-                    drumkitFName' = dir </> name
-                    drumkitFName  = if takeExtension drumkitFName' == ".xml"
-                      then drumkitFName'
-                      else addExtension drumkitFName' ".xml"
-                setDrumkit gui d'
-
-                res <-
-                  askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName
-                    $ writeDrumKitXML d' drumkitFName
-                case res of
-                  Left  err -> displayErrorBox (guiDkParentWindow gui) err
-                  Right _   -> return ()
+            drumkit <- getDrumkitGUI gui
+            let drumkitFName' = dir </> name
+                drumkitFName  = if takeExtension drumkitFName' == ".xml"
+                  then drumkitFName'
+                  else addExtension drumkitFName' ".xml"
+            res <-
+              askUserForOverwriteIfNecessary (guiFhDialog gui) drumkitFName
+                $ writeDrumKitXML drumkit drumkitFName
+            case res of
+              Left  err -> displayErrorBox (guiDkParentWindow gui) err
+              Right _   -> return ()
         _ -> return ()
     _ -> return ()
   widgetHide dialog
@@ -1177,6 +1161,17 @@ resetDrumkit gui = do
   return ()
 
 
+getInfo :: DrumkitPage -> IO (Either OldDescr MetaData)
+getInfo gui = do 
+  ena <- toggleButtonGetActive (guiMetaEnable gui)
+  if ena 
+    then Right <$> getDkMetaData gui 
+    else do 
+      nm   <- getDkName gui
+      desc <- getDkDescription gui
+      return $ Left (OldDescr nm desc)
+
+
 compileDrumkit :: DrumkitPage -> IO ()
 compileDrumkit gui = do
   inst  <- readIORef (guiDkInstrumentPages gui)
@@ -1192,11 +1187,10 @@ compileDrumkit gui = do
         errs
       return ()
     else do
-      nm   <- getDkName gui
-      desc <- getDkDescription gui
+      info <- getInfo gui
       sr   <- getDkSampleRateText gui
 
-      let drumkit = generateDrumkit nm desc (Just sr) insts
+      let drumkit = generateDrumkit info (Just sr) insts
           insts   = rights (V.toList instF)
 
       -- set the actual drumkit
@@ -1310,11 +1304,17 @@ loadDrumkit' gui file = do
 
 showDrumkit :: DrumkitPage -> Drumkit -> IO ()
 showDrumkit gui dk = do
-  entrySetText (guiDkName gui) (dkName dk)
-  setDkDescription gui (dkDescription dk)
   case dkSampleRate dk of
     Just sr -> setDkSampleRateText gui sr
     Nothing -> return ()
+  case dkInfo dk of 
+    Left descr -> do 
+      toggleButtonSetActive (guiMetaEnable gui) False 
+      entrySetText (guiDkName gui) (odName descr)
+      setDkDescription gui (odDescription descr)
+    Right meta -> do 
+      toggleButtonSetActive (guiMetaEnable gui) False 
+      setDkMetaData gui (Just meta)
 
   -- set the actual drumkit
   setDrumkit gui dk

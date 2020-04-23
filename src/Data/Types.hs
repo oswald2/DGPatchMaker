@@ -50,6 +50,20 @@ clearMetaData = MetaData (Just "")
                          (Just "")
 
 
+data ClickMapItem = ClickMapItem Text Text 
+  deriving Show 
+
+data ImageData = ImageData {
+  imgSource :: Text 
+  , imgMap :: Text 
+  , imgClickMap :: [ClickMapItem]
+  } deriving Show 
+
+data ChokeData = ChokeData {
+  chokeInstrument :: Text 
+  , chokeTime :: Int 
+  } deriving Show
+
 data OldDescr = OldDescr {
   odName :: !Text 
   , odDescription :: !Text 
@@ -68,7 +82,8 @@ data ChannelMap = ChannelMap {
     cmFile :: !FilePath,
     cmType :: Maybe Instrument,
     cmMap :: Vector ChannelMapItem,
-    cmContainsUndefined :: Bool
+    cmContainsUndefined :: Bool,
+    cmChokes :: [ChokeData]
 } deriving (Show)
 
 data ChannelMapItem = ChannelMapItem {
@@ -386,6 +401,7 @@ instrumentFileToChannelMap ifl = ChannelMap (ifName ifl)
                                             (ifType ifl)
                                             chans
                                             (cmCheckUndefined chans)
+                                            []
  where
   filePath = "Instruments" </> unpack (ifFileName ifl)
   grp (Just t) | t == HiHat = Just "hihat"
