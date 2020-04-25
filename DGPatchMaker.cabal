@@ -63,6 +63,7 @@ executable DGPatchMaker
       ,Data.Import
       ,Data.Types
       ,Data.Defaults
+      ,Data.Version
       ,Gtk.Colors
       ,Gtk.DGPatchMakerBuilder
       ,Gtk.Drumkit
@@ -103,7 +104,8 @@ executable DGPatchMaker
                        conduit-combinators,
                        network-uri,
                        gtk3,
-                       file-embed
+                       file-embed,
+                       gitrev
 
   ghc-options: -O2 -Wall -rtsopts -freverse-errors
 

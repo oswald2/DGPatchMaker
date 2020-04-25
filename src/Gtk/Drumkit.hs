@@ -32,6 +32,7 @@ import           Data.List                     as L
                                                 ( find
                                                 , sortOn
                                                 )
+import           Data.Version
 
 
 import           Data.Vector                    ( Vector )
@@ -143,6 +144,12 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
       castToMenuItem
       ("imagemenuitemSaveDrumkitFile" :: Text)
 
+    itemShowAbout <- builderGetObject builder
+                                      castToMenuItem
+                                      ("menuItemAbout" :: Text)
+    aboutDialog <- builderGetObject builder
+                                    castToAboutDialog
+                                    ("aboutDialog" :: Text)
 
     tvChannels <- builderGetObject builder
                                    castToTreeView
@@ -357,6 +364,18 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
       ena <- toggleButtonGetActive metaenable
       notebookSetCurrentPage metaNotebook (if ena then 1 else 0)
 
+    set
+      aboutDialog
+      [ aboutDialogProgramName := ("DGPatchMaker" :: Text)
+      , aboutDialogVersion := versionString
+      ]
+
+    void $ G.on itemShowAbout menuItemActivated $ do
+      widgetShow aboutDialog
+      void $ dialogRun aboutDialog
+      widgetHide aboutDialog
+      return ()
+
     setupCallbacks gui
 
     return gui
@@ -409,8 +428,8 @@ setDkDescription dkp desc = do
 
 
 setDkMetaData :: DrumkitPage -> Maybe MetaData -> IO ()
-setDkMetaData dkp Nothing  = do 
-  toggleButtonSetActive (guiMetaEnable dkp) False   
+setDkMetaData dkp Nothing = do
+  toggleButtonSetActive (guiMetaEnable dkp) False
 setDkMetaData dkp (Just m) = do
   toggleButtonSetActive (guiMetaEnable dkp) True
   entrySetText (guiMetaVersion dkp) $ fromMaybe "" (metaVersion m)
@@ -457,7 +476,7 @@ getDkMetaData dkp = do
   toMaybe txt = if T.null txt then Nothing else Just txt
   getTxt w = toMaybe <$> entryGetText w
 
-  getTxtV w = toMaybe <$> textViewGetText w 
+  getTxtV w = toMaybe <$> textViewGetText w
 
 
 initParserCombo :: ComboBox -> IO ()
@@ -595,7 +614,7 @@ importDrumDropsDrumKit' gui = do
               then 44100
               else let (_, sr) = Prelude.head insts in sr
               --sampleRate = 44100
-          info <- getInfo gui 
+          info <- getInfo gui
 
           let drumkit = generateDrumkit info
                                         (Just (T.pack (show sampleRate)))
@@ -1013,7 +1032,7 @@ writeDrumKitFile' gui nm basepath = do
       displayErrorBox (guiDkParentWindow gui) ("Error during export: " <> err)
     Right () -> do
       drumkit <- getDrumkitGUI gui
-      basedir  <- entryGetText (guiBaseDir gui)
+      basedir <- entryGetText (guiBaseDir gui)
       let dgPath       = getDrumgizmoDir basedir
           drumkitFName = dgPath </> T.unpack nm <.> ".xml"
 
@@ -1070,7 +1089,7 @@ getDrumkitGUI gui = do
         else do
           nm   <- getDkName gui
           desc <- getDkDescription gui
-          sr   <- getDkSampleRate gui 
+          sr   <- getDkSampleRate gui
           let oldDesc = OldDescr nm desc
               d       = Drumkit { dkInfo        = Left oldDesc
                                 , dkSampleRate  = (Just (T.pack (show sr)))
@@ -1164,11 +1183,11 @@ resetDrumkit gui = do
 
 
 getInfo :: DrumkitPage -> IO (Either OldDescr MetaData)
-getInfo gui = do 
+getInfo gui = do
   ena <- toggleButtonGetActive (guiMetaEnable gui)
-  if ena 
-    then Right <$> getDkMetaData gui 
-    else do 
+  if ena
+    then Right <$> getDkMetaData gui
+    else do
       nm   <- getDkName gui
       desc <- getDkDescription gui
       return $ Left (OldDescr nm desc)
@@ -1309,13 +1328,13 @@ showDrumkit gui dk = do
   case dkSampleRate dk of
     Just sr -> setDkSampleRateText gui sr
     Nothing -> return ()
-  case dkInfo dk of 
-    Left descr -> do 
-      toggleButtonSetActive (guiMetaEnable gui) False 
+  case dkInfo dk of
+    Left descr -> do
+      toggleButtonSetActive (guiMetaEnable gui) False
       entrySetText (guiDkName gui) (odName descr)
       setDkDescription gui (odDescription descr)
-    Right meta -> do 
-      toggleButtonSetActive (guiMetaEnable gui) False 
+    Right meta -> do
+      toggleButtonSetActive (guiMetaEnable gui) False
       setDkMetaData gui (Just meta)
 
   -- set the actual drumkit
