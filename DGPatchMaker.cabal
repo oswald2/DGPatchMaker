@@ -76,6 +76,7 @@ executable DGPatchMaker
       ,Gtk.MidiMap
       ,Gtk.NrHitsDialog
       ,Gtk.Utils
+      ,Gtk.DirectedChokeDialog
       ,GtkInterface
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:

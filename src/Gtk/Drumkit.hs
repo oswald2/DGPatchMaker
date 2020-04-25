@@ -414,19 +414,6 @@ setDkDescription dkp desc = do
   buffer <- textViewGetBuffer (guiDkDescription dkp)
   textBufferSetText buffer desc
 
--- enableDkMetaData :: DrumkitPage -> Bool -> IO ()
--- enableDkMetaData dkp val = do
---   widgetSetSensitive (guiMetaVersion dkp)     val
---   widgetSetSensitive (guiMetaTitle dkp)       val
---   widgetSetSensitive (guiMetaLogo dkp)        val
---   widgetSetSensitive (guiMetaDescription dkp) val
---   widgetSetSensitive (guiMetaLicense dkp)     val
---   widgetSetSensitive (guiMetaNotes dkp)       val
---   widgetSetSensitive (guiMetaAuthor dkp)      val
---   widgetSetSensitive (guiMetaEMail dkp)       val
---   widgetSetSensitive (guiMetaWebSite dkp)     val
-
-
 setDkMetaData :: DrumkitPage -> Maybe MetaData -> IO ()
 setDkMetaData dkp Nothing = do
   toggleButtonSetActive (guiMetaEnable dkp) False
@@ -760,20 +747,28 @@ initTvInstruments tv ls = do
   col1 <- treeViewColumnNew
   col2 <- treeViewColumnNew
   col3 <- treeViewColumnNew
+  col4 <- treeViewColumnNew
+  -- col5 <- treeViewColumnNew
 
   treeViewColumnSetTitle col1 ("Name" :: Text)
   treeViewColumnSetTitle col2 ("Group" :: Text)
   treeViewColumnSetTitle col3 ("File" :: Text)
+  treeViewColumnSetTitle col4 ("Directed Chokes" :: Text)
+  -- treeViewColumnSetTitle col5 ("Edit Chokes" :: Text)
 
   renderer1 <- cellRendererTextNew
   renderer2 <- cellRendererTextNew
   renderer3 <- cellRendererTextNew
+  renderer4 <- cellRendererToggleNew
+  -- renderer5 <- cellRendererPixbufNew
 
   set renderer2 [cellTextEditable := True, cellTextEditableSet := True]
 
   cellLayoutPackStart col1 renderer1 True
   cellLayoutPackStart col2 renderer2 True
   cellLayoutPackStart col3 renderer3 True
+  cellLayoutPackStart col4 renderer4 True
+  -- cellLayoutPackStart col5 renderer5 True
 
   cellLayoutSetAttributes col1 renderer1 ls $ \cm ->
     [ cellText := cmName cm
@@ -790,17 +785,31 @@ initTvInstruments tv ls = do
     , cellTextBackgroundColor := yellow
     , cellTextBackgroundSet := cmContainsUndefined cm
     ]
-
+  cellLayoutSetAttributes col4 renderer4 ls $ \cm ->
+    [ cellToggleActive := isEnabled (cmChokes cm)
+    , cellTextBackgroundColor := yellow
+    , cellTextBackgroundSet := cmContainsUndefined cm
+    ]
+  -- cellLayoutSetAttributes col5 renderer5 ls
+  --   $ const [cellPixbufStockId := ("gtk-edit" :: Text)
+  --     , cellMode := CellRendererModeActivatable
+  --     ]
 
   _ <- treeViewAppendColumn tv col1
   _ <- treeViewAppendColumn tv col2
   _ <- treeViewAppendColumn tv col3
+  _ <- treeViewAppendColumn tv col4
 
   treeViewSetEnableSearch tv True
   treeViewSetSearchEqualFunc tv $ Just $ \str iter -> do
     (i : _) <- treeModelGetPath ls iter
     row     <- listStoreGetValue ls i
     return $ T.toLower str `T.isPrefixOf` T.toLower (cmName row)
+
+  void $ on renderer4 cellToggled $ \str -> do
+    let (i : _) = stringToTreePath str
+    val <- listStoreGetValue ls i
+    listStoreSetValue ls i (val { cmChokes = toggleEnabled (cmChokes val) })
 
   return renderer2
 

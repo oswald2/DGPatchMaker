@@ -157,12 +157,14 @@ instrumentData =
                             Nothing
                             cm
                             (cmCheckUndefined cm)
-                            (fromMaybe [] chokes)
+                            (mapChokes chokes)
  where
   channelmap = tag'
     "channelmap"
     ((,,) <$> requireAttr "in" <*> requireAttr "out" <*> attr "main")
     return
+  mapChokes Nothing = Disabled [] 
+  mapChokes (Just chokes) = Enabled chokes
 
 
 chokeData :: (Monad m, MonadThrow m) => ConduitM Event o m (Maybe [ChokeData])

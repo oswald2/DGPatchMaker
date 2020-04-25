@@ -121,8 +121,8 @@ conduitDrumKitXML dr = tag
         (attr "name" (cmName x) <> gr x <> attr "file" (pack (cmFile x)))
       $  do
            case cmChokes x of
-             [] -> mempty
-             ls -> chokes ls
+             Disabled _ -> mempty
+             Enabled ls -> chokes ls
            channelmap x
       <> b
   gr x = case cmGroup x of

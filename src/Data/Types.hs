@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings 
+  , DeriveFunctor
+#-}
 module Data.Types where
 
 import           Control.Monad                  ( void )
@@ -53,23 +55,23 @@ clearMetaData = MetaData (Just "")
                          Nothing
 
 
-data ClickMapItem = ClickMapItem Text Text 
-  deriving Show 
+data ClickMapItem = ClickMapItem Text Text
+  deriving Show
 
 data ImageData = ImageData {
-  imgSource :: Text 
-  , imgMap :: Text 
+  imgSource :: Text
+  , imgMap :: Text
   , imgClickMap :: [ClickMapItem]
-  } deriving Show 
+  } deriving Show
 
 data ChokeData = ChokeData {
-  chokeInstrument :: Text 
-  , chokeTime :: Int 
+  chokeInstrument :: Text
+  , chokeTime :: Int
   } deriving Show
 
 data OldDescr = OldDescr {
-  odName :: !Text 
-  , odDescription :: !Text 
+  odName :: !Text
+  , odDescription :: !Text
   } deriving(Show)
 
 data Drumkit = Drumkit {
@@ -79,6 +81,18 @@ data Drumkit = Drumkit {
     dkInstruments :: [ChannelMap]
 } deriving (Show)
 
+
+data Enabled a = Enabled a | Disabled a
+  deriving (Show, Functor)
+
+isEnabled :: Enabled a -> Bool
+isEnabled (Enabled _) = True
+isEnabled _           = False
+
+toggleEnabled :: Enabled a -> Enabled a
+toggleEnabled (Enabled  x) = Disabled x
+toggleEnabled (Disabled x) = Enabled x
+
 data ChannelMap = ChannelMap {
     cmName :: !Text,
     cmGroup :: Maybe Text,
@@ -86,7 +100,7 @@ data ChannelMap = ChannelMap {
     cmType :: Maybe Instrument,
     cmMap :: Vector ChannelMapItem,
     cmContainsUndefined :: Bool,
-    cmChokes :: [ChokeData]
+    cmChokes :: Enabled [ChokeData]
 } deriving (Show)
 
 data ChannelMapItem = ChannelMapItem {
@@ -387,7 +401,8 @@ validateMic txt = case parse micParser "" txt of
   Right mic -> Right mic
 
 
-generateDrumkit :: Either OldDescr MetaData -> Maybe Text -> [InstrumentFile] -> Drumkit
+generateDrumkit
+  :: Either OldDescr MetaData -> Maybe Text -> [InstrumentFile] -> Drumkit
 generateDrumkit descr samplerate ifl = res
  where
   res       = Drumkit descr samplerate channels chanMap
@@ -404,7 +419,7 @@ instrumentFileToChannelMap ifl = ChannelMap (ifName ifl)
                                             (ifType ifl)
                                             chans
                                             (cmCheckUndefined chans)
-                                            []
+                                            (Disabled [])
  where
   filePath = "Instruments" </> unpack (ifFileName ifl)
   grp (Just t) | t == HiHat = Just "hihat"
