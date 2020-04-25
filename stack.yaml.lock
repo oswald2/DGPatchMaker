@@ -60,13 +60,6 @@ packages:
       sha256: 328fc8a2e574379bfbc9b710270d3f6be7ed2c9bf5e10477a3256c0d2d362024
   original:
     hackage: pango-0.13.8.0
-- completed:
-    hackage: parsec3-1.0.1.8@sha256:1a9d626a0f19753617c75ea84e022592c0fb77af5f9772de5b7c0cf101bd61e7,2159
-    pantry-tree:
-      size: 1130
-      sha256: d7d8f1b32a5ab70796924457d97556c299bf05c9c32ca01e21cde05212111ab5
-  original:
-    hackage: parsec3-1.0.1.8
 snapshots:
 - completed:
     size: 524996

@@ -24,11 +24,13 @@ data MetaData = MetaData {
   , metaAuthor :: Maybe Text
   , metaEMail :: Maybe Text
   , metaWebsite :: Maybe Text
+  , metaImage :: Maybe ImageData
   } deriving (Show)
 
 
 emptyMetaData :: MetaData
 emptyMetaData = MetaData Nothing
+                         Nothing
                          Nothing
                          Nothing
                          Nothing
@@ -48,6 +50,7 @@ clearMetaData = MetaData (Just "")
                          (Just "")
                          (Just "")
                          (Just "")
+                         Nothing
 
 
 data ClickMapItem = ClickMapItem Text Text 

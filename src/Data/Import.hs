@@ -206,7 +206,7 @@ conduitMeta = tagNoAttr "metadata" $ do
   auth <- author
   em   <- email
   ws   <- website
-  _im  <- imageData
+  im  <- imageData
 
   return MetaData { metaVersion     = v
                   , metaTitle       = t
@@ -217,6 +217,7 @@ conduitMeta = tagNoAttr "metadata" $ do
                   , metaAuthor      = auth
                   , metaEMail       = em
                   , metaWebsite     = ws
+                  , metaImage       = im
                   }
  where
   version     = tagNoAttr "version" content

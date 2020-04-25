@@ -9,7 +9,9 @@ where
 
 
 import           Data.Monoid                    ( (<>) )
-import           Data.Text                      ( Text, pack )
+import           Data.Text                      ( Text
+                                                , pack
+                                                )
 import qualified Data.Text.Lazy                as L
 import           Data.Text.Lazy.Builder        as L
 import           Data.Text.Lazy.Builder.Int    as L
@@ -76,8 +78,7 @@ conduitMidiMap (MidiMap mp) = tag "midimap" mempty noteEntries
  where
   noteEntries = foldr f mempty mp
   f (note, instr) b =
-    tag "map" (attr "note" (pack (show note)) <> attr "instr" instr) mempty
-      <> b
+    tag "map" (attr "note" (pack (show note)) <> attr "instr" instr) mempty <> b
 
 conduitFullMidiMap :: Monad m => MidiMap -> ConduitT () Event m ()
 conduitFullMidiMap mm = do
@@ -93,13 +94,13 @@ writeMidiMapXML mp filename = do
     C..| C.sinkFile filename
 
 
-dkName :: Drumkit -> Maybe Text 
+dkName :: Drumkit -> Maybe Text
 dkName Drumkit { dkInfo = Left descr } = Just (odName descr)
-dkName _ = Nothing 
+dkName _                               = Nothing
 
-dkDescription :: Drumkit -> Maybe Text 
+dkDescription :: Drumkit -> Maybe Text
 dkDescription Drumkit { dkInfo = Left descr } = Just (odDescription descr)
-dkDescription _ = Nothing 
+dkDescription _                               = Nothing
 
 
 conduitDrumKitXML :: Monad m => Drumkit -> ConduitT () Event m ()
@@ -118,7 +119,11 @@ conduitDrumKitXML dr = tag
   ins x b =
     tag "instrument"
         (attr "name" (cmName x) <> gr x <> attr "file" (pack (cmFile x)))
-        (channelmap x)
+      $  do
+           case cmChokes x of
+             [] -> mempty
+             ls -> chokes ls
+           channelmap x
       <> b
   gr x = case cmGroup x of
     Just g  -> attr "group" g
@@ -132,30 +137,56 @@ conduitDrumKitXML dr = tag
         <> b
     else tag "channelmap" (attr "in" c1 <> attr "out" c2) mempty <> b
 
+  chokes ls = tag "chokes" mempty $ foldr insChokes mempty ls
+  insChokes choke acc =
+    tag
+        "choke"
+        (  attr "instrument" (chokeInstrument choke)
+        <> attr "choketime"  (pack (show (chokeTime choke)))
+        )
+        mempty
+      <> acc
+
+
 
 metadata :: Monad m => Either OldDescr MetaData -> ConduitT () Event m ()
-metadata (Left _)  = mempty
+metadata (Left  _) = mempty
 metadata (Right m) = tag
   "metadata"
   mempty
-  (  version 
-  <> title 
-  <> logo 
-  <> description 
-  <> license 
-  <> notes 
-  <> email 
+  (  version
+  <> title
+  <> logo
+  <> description
+  <> license
+  <> notes
+  <> email
   <> website
+  <> image
   )
  where
-  version     = maybe mempty (tag "version" mempty . content) (metaVersion m)
-  title       = maybe mempty (tag "title" mempty . content) (metaTitle m)
-  logo        = maybe mempty (\v -> tag "logo" (attr "src" v) mempty) (metaLogo m)
-  description = maybe mempty (tag "description" mempty . content) (metaDescription m)
-  license     = maybe mempty (tag "license" mempty . content) (metaLicense m)
-  notes       = maybe mempty (tag "notes" mempty . content) (metaNotes m)
-  email       = maybe mempty (tag "email" mempty . content) (metaEMail m)
-  website     = maybe mempty (tag "website" mempty . content) (metaWebsite m)
+  version = maybe mempty (tag "version" mempty . content) (metaVersion m)
+  title   = maybe mempty (tag "title" mempty . content) (metaTitle m)
+  logo    = maybe mempty (\v -> tag "logo" (attr "src" v) mempty) (metaLogo m)
+  description =
+    maybe mempty (tag "description" mempty . content) (metaDescription m)
+  license = maybe mempty (tag "license" mempty . content) (metaLicense m)
+  notes   = maybe mempty (tag "notes" mempty . content) (metaNotes m)
+  email   = maybe mempty (tag "email" mempty . content) (metaEMail m)
+  website = maybe mempty (tag "website" mempty . content) (metaWebsite m)
+  image   = maybe mempty conduitImage (metaImage m)
+
+
+
+conduitImage :: Monad m => ImageData -> ConduitT () Event m ()
+conduitImage imageData = do
+  tag "image"
+      (attr "src" (imgSource imageData) <> attr "map" (imgMap imageData))
+    $ foldr ins mempty (imgClickMap imageData)
+ where
+  ins (ClickMapItem col inst) acc =
+    tag "clickmap" (attr "colour" col <> attr "instrument" inst) mempty <> acc
+
 
 
 

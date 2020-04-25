@@ -441,6 +441,7 @@ getDkMetaData dkp = do
   license <- getTxtV (guiMetaLicense dkp)
   notes   <- getTxtV (guiMetaNotes dkp)
 
+  -- TODO: add image data 
   return MetaData { metaVersion     = vers
                   , metaTitle       = title
                   , metaLogo        = logo
@@ -450,6 +451,7 @@ getDkMetaData dkp = do
                   , metaAuthor      = author
                   , metaEMail       = email
                   , metaWebsite     = website
+                  , metaImage       = Nothing
                   }
  where
   toMaybe txt = if T.null txt then Nothing else Just txt
