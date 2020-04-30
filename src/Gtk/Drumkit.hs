@@ -55,6 +55,8 @@ import           Gtk.InstrumentFrame
 import           Gtk.ErrorDialog
 import           Gtk.MidiMap
 import           Gtk.FileHandlingDialog
+import           Gtk.DirectedChokeDialog
+
 
 
 data DrumkitPage = DrumkitPage {
@@ -100,7 +102,9 @@ data DrumkitPage = DrumkitPage {
     guiMetaEMail :: Entry,
     guiMetaWebSite :: Entry,
     guiMetaEnable :: CheckButton,
-    guiMetaNotebook :: Notebook
+    guiMetaNotebook :: Notebook,
+    guiButtonEditChokes :: Button,
+    guiDirectedChokeDialog :: DirectedChokeDialog
 }
 
 
@@ -200,6 +204,10 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
                                      castToNotebook
                                      ("notebookMetaData" :: Text)
 
+    buttonEditChokes <- builderGetObject builder
+                                         castToButton
+                                         ("buttonEditChokes" :: Text)
+
     lsm             <- listStoreNew []
     lsinst          <- listStoreNew []
     lscm            <- listStoreNew []
@@ -212,6 +220,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     channelRenderer <- initTvChannels tvChannels lsm
     groupRenderer   <- initTvInstruments tvInstruments lsinst
     outRenderer     <- initTvChannelMap tvChannelMap lsm lscm lsinst selIoRef
+
+    chokeDialog     <- initDialog mainWindow builder
 
     -- entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
     -- entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
@@ -327,6 +337,8 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
                           , guiMetaWebSite           = ewebsite
                           , guiMetaEnable            = metaenable
                           , guiMetaNotebook          = metaNotebook
+                          , guiButtonEditChokes      = buttonEditChokes
+                          , guiDirectedChokeDialog   = chokeDialog 
                           }
     --setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
     setDkDescription gui ""
@@ -914,8 +926,20 @@ setupCallbacks gui = do
   void $ G.on instView rowActivated $ \(i : _) _ -> do
     !row <- listStoreGetValue instViewModel i
     setChannelMap gui i row
-
+    widgetSetSensitive (guiButtonEditChokes gui) True
     return ()
+
+  void $ G.on (guiButtonEditChokes gui) buttonActivated $ do
+    availableInstruments <- map cmName <$> listStoreToList instViewModel
+    sel <- treeViewGetSelection instView 
+    rows <- treeSelectionGetSelectedRows sel 
+    case rows of 
+      ((x: _): _) -> do
+        inst <- listStoreGetValue instViewModel x 
+        newInst <- showChokeDialog (guiDirectedChokeDialog gui) inst availableInstruments
+        forM_ newInst $ listStoreSetValue instViewModel x
+      _ -> return () 
+
 
   void $ G.on (guiDkName gui) entryActivated $ do
     nm <- getDkName gui

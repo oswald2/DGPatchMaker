@@ -69,6 +69,10 @@ data ChokeData = ChokeData {
   , chokeTime :: Int
   } deriving Show
 
+instance Eq ChokeData where 
+  c1 == c2 = chokeInstrument c1 == chokeInstrument c2
+
+
 data OldDescr = OldDescr {
   odName :: !Text
   , odDescription :: !Text
@@ -93,6 +97,11 @@ toggleEnabled :: Enabled a -> Enabled a
 toggleEnabled (Enabled  x) = Disabled x
 toggleEnabled (Disabled x) = Enabled x
 
+enabledPayload :: Enabled a -> a 
+enabledPayload (Enabled x) = x 
+enabledPayload (Disabled x) = x 
+
+
 data ChannelMap = ChannelMap {
     cmName :: !Text,
     cmGroup :: Maybe Text,
@@ -102,6 +111,10 @@ data ChannelMap = ChannelMap {
     cmContainsUndefined :: Bool,
     cmChokes :: Enabled [ChokeData]
 } deriving (Show)
+
+getChokes :: ChannelMap -> [ChokeData]
+getChokes = enabledPayload . cmChokes 
+
 
 data ChannelMapItem = ChannelMapItem {
     cmiIn :: !Text,
