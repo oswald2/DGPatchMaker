@@ -244,7 +244,7 @@ clickMapItem
   :: (Monad m, MonadThrow m) => ConduitM Event o m (Maybe ClickMapItem)
 clickMapItem =
   tag' "clickmap"
-       (ClickMapItem <$> requireAttr "colour" <*> requireAttr "instrument")
+       (ClickMapItem <$> requireAttr "instrument" <*> requireAttr "colour")
     $ \item -> return item
 
 

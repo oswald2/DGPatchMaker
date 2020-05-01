@@ -55,7 +55,10 @@ clearMetaData = MetaData (Just "")
                          Nothing
 
 
-data ClickMapItem = ClickMapItem Text Text
+data ClickMapItem = ClickMapItem { 
+  cmiInstrument :: Text 
+  , cmiColour :: Text
+  }
   deriving Show
 
 data ImageData = ImageData {
@@ -63,6 +66,13 @@ data ImageData = ImageData {
   , imgMap :: Text
   , imgClickMap :: [ClickMapItem]
   } deriving Show
+
+newImageData :: [Text] -> ImageData 
+newImageData availableInstruments = 
+  ImageData "" "" (Prelude.map dat availableInstruments)
+  where 
+    dat inst = ClickMapItem { cmiInstrument = inst, cmiColour = "" }
+
 
 data ChokeData = ChokeData {
   chokeInstrument :: Text

@@ -77,6 +77,7 @@ executable DGPatchMaker
       ,Gtk.NrHitsDialog
       ,Gtk.Utils
       ,Gtk.DirectedChokeDialog
+      ,Gtk.ClickyKitDialog
       ,GtkInterface
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
@@ -84,7 +85,8 @@ executable DGPatchMaker
   -- Other library packages from which modules are imported.
   build-depends:       base,
                        text,
-                       text-format,
+                       --text-format,
+                       text-builder,
                        vector,
                        directory,
                        filepath,
@@ -106,7 +108,8 @@ executable DGPatchMaker
                        network-uri,
                        gtk3,
                        file-embed,
-                       gitrev
+                       gitrev,
+                       array 
 
   ghc-options: -O2 -Wall -rtsopts -freverse-errors
 

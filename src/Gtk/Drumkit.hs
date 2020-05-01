@@ -56,6 +56,7 @@ import           Gtk.ErrorDialog
 import           Gtk.MidiMap
 import           Gtk.FileHandlingDialog
 import           Gtk.DirectedChokeDialog
+import           Gtk.ClickyKitDialog
 
 
 
@@ -104,7 +105,10 @@ data DrumkitPage = DrumkitPage {
     guiMetaEnable :: CheckButton,
     guiMetaNotebook :: Notebook,
     guiButtonEditChokes :: Button,
-    guiDirectedChokeDialog :: DirectedChokeDialog
+    guiDirectedChokeDialog :: DirectedChokeDialog,
+    guiClickyKitDialog :: ClickyKitDialog,
+    guiClickyKitCheck :: CheckButton,
+    guiButtonEditClickyKit :: Button
 }
 
 
@@ -222,6 +226,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     outRenderer     <- initTvChannelMap tvChannelMap lsm lscm lsinst selIoRef
 
     chokeDialog     <- initDialog mainWindow builder
+    clickyKitDialog <- initClickyKitDialog mainWindow builder
 
     -- entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
     -- entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
@@ -290,9 +295,16 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
                                      castToButton
                                      ("buttonCompileFromKitDefault" :: Text)
 
-    btUp   <- builderGetObject builder castToButton ("buttonUp" :: Text)
-    btDown <- builderGetObject builder castToButton ("buttonDown" :: Text)
-    btSort <- builderGetObject builder castToButton ("buttonSort" :: Text)
+    btUp      <- builderGetObject builder castToButton ("buttonUp" :: Text)
+    btDown    <- builderGetObject builder castToButton ("buttonDown" :: Text)
+    btSort    <- builderGetObject builder castToButton ("buttonSort" :: Text)
+
+    chkClicky <- builderGetObject builder
+                                  castToCheckButton
+                                  ("checkbuttonClickyKit" :: Text)
+    btClicky <- builderGetObject builder
+                                 castToButton
+                                 ("buttonShowClickyKit" :: Text)
 
     let gui = DrumkitPage { guiDkParentWindow        = mainWindow
                           , guiTvChannels            = tvChannels
@@ -338,7 +350,10 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
                           , guiMetaEnable            = metaenable
                           , guiMetaNotebook          = metaNotebook
                           , guiButtonEditChokes      = buttonEditChokes
-                          , guiDirectedChokeDialog   = chokeDialog 
+                          , guiDirectedChokeDialog   = chokeDialog
+                          , guiClickyKitDialog       = clickyKitDialog
+                          , guiClickyKitCheck        = chkClicky
+                          , guiButtonEditClickyKit   = btClicky
                           }
     --setDkDescription gui "Mapex Heavy Rock Kit patch from the All Samples Pack from DrumDrops (http://www.drumdrops.com). Created by M. Oswald."
     setDkDescription gui ""
@@ -444,6 +459,8 @@ setDkMetaData dkp (Just m) = do
     >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaLicense m)
   textViewGetBuffer (guiMetaNotes dkp)
     >>= \buf -> textBufferSetText buf $ fromMaybe "" (metaNotes m)
+
+  toggleButtonSetActive (guiClickyKitCheck dkp) $ isJust (metaImage m)
 
 
 getDkMetaData :: DrumkitPage -> IO MetaData
@@ -931,15 +948,41 @@ setupCallbacks gui = do
 
   void $ G.on (guiButtonEditChokes gui) buttonActivated $ do
     availableInstruments <- map cmName <$> listStoreToList instViewModel
-    sel <- treeViewGetSelection instView 
-    rows <- treeSelectionGetSelectedRows sel 
-    case rows of 
-      ((x: _): _) -> do
-        inst <- listStoreGetValue instViewModel x 
-        newInst <- showChokeDialog (guiDirectedChokeDialog gui) inst availableInstruments
+    sel                  <- treeViewGetSelection instView
+    rows                 <- treeSelectionGetSelectedRows sel
+    case rows of
+      ((x : _) : _) -> do
+        inst    <- listStoreGetValue instViewModel x
+        newInst <- showChokeDialog (guiDirectedChokeDialog gui)
+                                   inst
+                                   availableInstruments
         forM_ newInst $ listStoreSetValue instViewModel x
-      _ -> return () 
+      _ -> return ()
 
+  void $ G.on (guiButtonEditClickyKit gui) buttonActivated $ do 
+    availableInstruments <- map cmName <$> listStoreToList instViewModel
+    kit' <- readIORef (guiDrumkit gui)
+    case kit' of 
+      Nothing -> return ()
+      Just kit -> do 
+        case dkInfo kit of 
+          Left _ -> return () 
+          Right meta -> do 
+              let img = case metaImage meta of 
+                          Just image -> image 
+                          Nothing -> newImageData availableInstruments
+              basepath <- entryGetText (guiBaseDir gui)
+              newImg' <- showClickyKitDialog (guiClickyKitDialog gui) img basepath
+              case newImg' of 
+                Nothing -> return () 
+                Just newImg -> do 
+                  let !newMeta = meta { metaImage = Just newImg }
+                      !newDk = kit { dkInfo = Right newMeta }
+                  writeIORef (guiDrumkit gui) (Just newDk)
+
+  void $ G.on (guiClickyKitCheck gui) toggled $ do 
+    val <- toggleButtonGetActive (guiClickyKitCheck gui)
+    widgetSetSensitive (guiButtonEditClickyKit gui) val 
 
   void $ G.on (guiDkName gui) entryActivated $ do
     nm <- getDkName gui
