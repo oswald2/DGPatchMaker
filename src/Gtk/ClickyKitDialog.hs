@@ -45,8 +45,8 @@ data ClickyKitDialog = ClickyKitDialog {
   }
 
 
-initClickyKitDialog :: Window -> G.Builder -> IO ClickyKitDialog
-initClickyKitDialog window builder = do
+initClickyKitDialog :: Window -> G.Builder -> Entry -> IO ClickyKitDialog
+initClickyKitDialog window builder basepathEntry = do
 
   diag <- builderGetObject builder castToDialog ("clickyKitDialog" :: Text)
 
@@ -74,6 +74,8 @@ initClickyKitDialog window builder = do
 
 
   widgetAddEvents cmImage [ButtonPressMask]
+  miscSetAlignment cmImage 0 0
+  miscSetAlignment dkImage 0 0
 
   model <- listStoreNew []
   ref   <- newIORef Nothing
@@ -137,6 +139,16 @@ initClickyKitDialog window builder = do
 
   void $ on eventBox buttonPressEvent $ doubleClickCB gui
 
+  let cb entry image = do 
+        basepath <- entryGetText basepathEntry
+        file <- loadImage gui basepath 
+        forM_ file $ \f -> do 
+          entrySetText entry (takeFileName f)
+          imageSetFromFile image f
+
+  void $ on dkButton buttonActivated $ cb dkEntry dkImage 
+  void $ on cmButton buttonActivated $ cb cmEntry cmImage
+  
   return gui
 
 
@@ -148,13 +160,33 @@ doubleClickCB diag = do
       cl <- eventClick
       case cl of
         DoubleClick -> do
-          px <- eventCoordinates
-          color <- liftIO $ getColor diag px
-          liftIO $ putStrLn $ "ClickMap clicked: " <> show px <> " color: " <> T.unpack color
-          return True
+          px@(x, y) <- eventCoordinates
+          liftIO $ do 
+            pixbuf <- imageGetPixbuf (ckdCMImage diag)
+            width <- pixbufGetWidth pixbuf 
+            height <- pixbufGetHeight pixbuf 
+
+            if round x < width && round y < height 
+              then do
+                color <- getColor diag px
+                putStrLn $ "ClickMap clicked: " <> show px <> " color: " <> T.unpack color
+                setColorToSelected diag color 
+                return True
+              else return False 
         _ -> return False
     _ -> return False
 
+
+setColorToSelected :: ClickyKitDialog -> Text -> IO () 
+setColorToSelected diag color = do 
+  sel <- treeViewGetSelection (ckdTreeView diag)
+  rows' <- treeSelectionGetSelectedRows sel 
+  case rows' of 
+    ((i: _) : _) -> do 
+      val <- listStoreGetValue (ckdTreeModel diag) i
+      let !newVal = val { cmiColour = color }
+      listStoreSetValue (ckdTreeModel diag) i newVal 
+    _ -> return () 
 
 getColor :: ClickyKitDialog -> (Double, Double) -> IO Text
 getColor diag (x, y) = do
@@ -184,7 +216,7 @@ getColor diag (x, y) = do
                   .|.      fromIntegral g
                   `shiftL` 8
                   .|.      fromIntegral b
-          return (run (hexadecimal val))
+          return (run (padFromLeft 6 '0' (hexadecimal val)))
         else return ""
 
 
@@ -213,6 +245,8 @@ setImageData diag img basepath = do
   imageSetFromFile (ckdCMImage diag) (basepath </> T.unpack (imgMap img))
 
 
+
+
 getImageData :: ClickyKitDialog -> IO ImageData
 getImageData diag = do
   ImageData
@@ -220,3 +254,25 @@ getImageData diag = do
     <*> entryGetText (ckdCMEntry diag)
     <*> listStoreToList (ckdTreeModel diag)
 
+
+loadImage :: ClickyKitDialog -> FilePath -> IO (Maybe FilePath)
+loadImage diag basepath = do 
+  dialog <- fileChooserDialogNew
+    (Just ("Load Image File" :: Text))             --dialog title
+    (Just (ckdWindow diag))                     --the parent window
+    FileChooserActionSave                         --the kind of dialog we want
+    [ ( "gtk-cancel"                                --The buttons to display
+      , ResponseCancel
+      )
+    , ("gtk-open", ResponseAccept)
+    ]
+
+  void $ fileChooserSetCurrentFolder dialog basepath 
+
+  widgetShow dialog
+  resp <- dialogRun dialog
+  widgetHide dialog
+  case resp of
+    ResponseAccept -> do
+      fileChooserGetFilename dialog
+    _ -> return Nothing 

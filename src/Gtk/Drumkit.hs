@@ -226,7 +226,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     outRenderer     <- initTvChannelMap tvChannelMap lsm lscm lsinst selIoRef
 
     chokeDialog     <- initDialog mainWindow builder
-    clickyKitDialog <- initClickyKitDialog mainWindow builder
+    clickyKitDialog <- initClickyKitDialog mainWindow builder entryBaseDirectory
 
     -- entrySetText entryBaseDirectory ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack" :: FilePath)
     -- entrySetText entrySamplesDir ("/home/oswald/Sounds/Drumkits/2015_10_04_Mapex_Kit_AS_Pack_V2.3/Multi Velocity Pack/SAMPLES" :: FilePath)
@@ -792,6 +792,7 @@ initTvInstruments tv ls = do
   -- renderer5 <- cellRendererPixbufNew
 
   set renderer2 [cellTextEditable := True, cellTextEditableSet := True]
+  set renderer4 [cellXAlign := 0]
 
   cellLayoutPackStart col1 renderer1 True
   cellLayoutPackStart col2 renderer2 True
@@ -870,6 +871,8 @@ initTvChannelMap tv lsMicros ls lsinst ref = do
   renderer1 <- cellRendererTextNew
   renderer2 <- cellRendererComboNew
   renderer3 <- cellRendererToggleNew
+
+  set renderer3 [cellXAlign := 0]
 
   void $ on renderer3 cellToggled $ \str -> do
     let (i : _) = stringToTreePath str
