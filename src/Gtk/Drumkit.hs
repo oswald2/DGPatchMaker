@@ -412,6 +412,21 @@ getDkName :: DrumkitPage -> IO Text
 getDkName dkp = entryGetText (guiDkName dkp)
 
 
+getMetaDkName :: DrumkitPage -> IO Text 
+getMetaDkName dkp = entryGetText (guiMetaTitle dkp)
+
+getName :: DrumkitPage -> IO (Maybe Text)
+getName dkp = do 
+  nm <- getMetaDkName dkp 
+  if T.null nm 
+    then do 
+      nm2 <- getDkName dkp 
+      if T.null nm2 then return Nothing 
+      else return (Just nm2)
+    else return (Just nm)
+
+
+
 getDkDescription :: DrumkitPage -> IO Text
 getDkDescription dkp = do
   buffer       <- textViewGetBuffer (guiDkDescription dkp)
@@ -476,8 +491,14 @@ getDkMetaData dkp = do
   license <- getTxtV (guiMetaLicense dkp)
   notes   <- getTxtV (guiMetaNotes dkp)
 
-  -- TODO: add image data 
-  return MetaData { metaVersion     = vers
+  dk' <- readIORef (guiDrumkit dkp)
+  let img = case dk' of 
+        Nothing -> Nothing 
+        Just dk -> case dkInfo dk of 
+          Left _ -> Nothing 
+          Right meta -> metaImage meta 
+
+  let !newMeta = MetaData { metaVersion     = vers
                   , metaTitle       = title
                   , metaLogo        = logo
                   , metaDescription = descr
@@ -486,8 +507,9 @@ getDkMetaData dkp = do
                   , metaAuthor      = author
                   , metaEMail       = email
                   , metaWebsite     = website
-                  , metaImage       = Nothing
+                  , metaImage       = img
                   }
+  return newMeta
  where
   toMaybe txt = if T.null txt then Nothing else Just txt
   getTxt w = toMaybe <$> entryGetText w
@@ -1078,18 +1100,13 @@ exportDrumKit gui = do
   if null basepath
     then displayErrorBox (guiDkParentWindow gui) "No basepath specified!"
     else do
-      nm <- getDkName gui
-      if T.null nm
-        then displayErrorBox (guiDkParentWindow gui)
+      nm' <- getName gui
+      case nm' of 
+        Nothing -> do         
+          displayErrorBox (guiDkParentWindow gui)
                              "No drumkit name specified!"
-        else withFileHandlingDialog (guiFhDialog gui) $ do
+        Just nm -> withFileHandlingDialog (guiFhDialog gui) $ do
           writeDrumKitFile gui nm basepath
-                            -- get the midi map and write it
-                            --gmMidi <- getMidiMapFromGUI (guiMidiMapGM gui)
-                            --defMidi <- getMidiMapFromGUI (guiMidiMapDef gui)
-
-                            --writeMidiMapFile (guiMidiMapGM gui) "MIDIMap_GM.xml" gmMidi
-                            --writeMidiMapFile (guiMidiMapDef gui) "MIDIMap_Default.xml" defMidi
 
 
 

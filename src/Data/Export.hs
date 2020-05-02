@@ -115,16 +115,15 @@ conduitDrumKitXML dr = tag
 
   channels = tag "channels" mempty (foldr ch mempty (dkChannels dr))
   ch x b = tag "channel" (attr "name" x) mempty <> b
-  instruments = tag "instruments" mempty (foldr ins mempty (dkInstruments dr))
-  ins x b =
+  instruments = tag "instruments" mempty (mapM_ ins (dkInstruments dr))
+  ins x =
     tag "instrument"
         (attr "name" (cmName x) <> gr x <> attr "file" (pack (cmFile x)))
       $  do
            case cmChokes x of
-             Disabled _ -> mempty
+             Disabled _ -> return ()
              Enabled ls -> chokes ls
            channelmap x
-      <> b
   gr x = case cmGroup x of
     Just g  -> attr "group" g
     Nothing -> mempty
@@ -184,7 +183,7 @@ conduitImage imageData = do
       (attr "src" (imgSource imageData) <> attr "map" (imgMap imageData))
     $ foldr ins mempty (imgClickMap imageData)
  where
-  ins (ClickMapItem col inst) acc =
+  ins ClickMapItem {cmiInstrument = inst, cmiColour = col} acc =
     tag "clickmap" (attr "colour" col <> attr "instrument" inst) mempty <> acc
 
 

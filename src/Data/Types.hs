@@ -56,14 +56,14 @@ clearMetaData = MetaData (Just "")
 
 
 data ClickMapItem = ClickMapItem { 
-  cmiInstrument :: Text 
-  , cmiColour :: Text
+  cmiInstrument :: !Text 
+  , cmiColour :: !Text
   }
   deriving Show
 
 data ImageData = ImageData {
-  imgSource :: Text
-  , imgMap :: Text
+  imgSource :: !Text
+  , imgMap :: !Text
   , imgClickMap :: [ClickMapItem]
   } deriving Show
 
@@ -75,8 +75,8 @@ newImageData availableInstruments =
 
 
 data ChokeData = ChokeData {
-  chokeInstrument :: Text
-  , chokeTime :: Int
+  chokeInstrument :: !Text
+  , chokeTime :: !Int
   } deriving Show
 
 instance Eq ChokeData where 
