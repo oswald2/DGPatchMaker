@@ -222,6 +222,7 @@ getMic = hMicType
 data InstrumentFile = InstrumentFile {
     ifVersion :: !Text,
     ifName :: !Text,
+    ifFilePath :: !Text,
     ifFileName :: !Text,
     ifType :: Maybe Instrument,
     ifSamples :: [HitSample]

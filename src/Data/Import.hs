@@ -67,8 +67,9 @@ parseInstrument fname = do
           smpls <- tagNoAttr "samples" $ many parseSamples
           return (version, name, smpls)
   case inst of
-    Just (vers, nam, Just smpl) ->
-      return $ Just (InstrumentFile vers nam (pack fname) Nothing smpl)
+    Just (vers, nam, Just smpl) -> do 
+      let (path, instFileName) = splitFileName fname
+      return $ Just (InstrumentFile vers nam (pack path) (pack instFileName) Nothing smpl)
     _ -> return Nothing
 
 

@@ -159,6 +159,7 @@ convertSampleGroup :: ParserType -> FilePath -> SampleGroup -> InstrumentFile
 convertSampleGroup parserType basepath sg = InstrumentFile
     dgDefaultVersion
     nm
+    fpath
     fname
     (Just (sgInstrument sg))
     groups
@@ -172,6 +173,7 @@ convertSampleGroup parserType basepath sg = InstrumentFile
         )
         (sgGroups sg)
         [1 ..]
+    fpath = ""
     fname = nm `append` ".xml"
 
 
@@ -233,15 +235,38 @@ convertSample parserType basepath path sampleGroup x = case saChannels x of
 
 
 
-determinePath :: FilePath -> FilePath -> Text -> FilePath
-determinePath basepath path filename =
-    "../../" </> makeRelative basepath path </> unpack filename
+-- determinePath :: FilePath -> FilePath -> Text -> FilePath
+-- determinePath basepath path filename =
+--     "../../" </> makeRelative basepath path </> unpack filename
+
+determinePath :: FilePath -> FilePath -> Text -> FilePath 
+determinePath basepath path filename = 
+    let intermediate = makeRelative basepath path 
+    in if intermediate == path 
+        then doRelativeThing basepath path </> unpack filename 
+        else intermediate </> unpack filename 
 
 
+doRelativeThing :: FilePath -> FilePath -> FilePath 
+doRelativeThing basepath path = 
+    let dirs1 = splitPath basepath 
+        dirs2 = splitPath path 
+        (x, y) = process dirs1 dirs2 
+        up = map (const "..") y
+        result = joinPath (up ++ x)
+    in
+    result
+    where 
+        process [] y = ([], y)
+        process x [] = (x, [])
+        process xres@(x:xs) yres@(y:ys) = 
+            if x == y then process xs ys 
+                else (xres, yres)
+        
 
 
 getMaxVelocity :: SampleGroup -> Double
-getMaxVelocity (SampleGroup {..}) = P.maximum (P.map vgVelocity sgGroups)
+getMaxVelocity SampleGroup {..} = P.maximum (P.map vgVelocity sgGroups)
 
 
 
