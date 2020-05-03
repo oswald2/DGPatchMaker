@@ -12,12 +12,6 @@ This is not as trivial as it sounds, as every sample library is structured diffe
 
 ## Functionality 
 
-Following functionality is NOT YET supported:
- 
- * Clicky Kit / Image Maps 
- * Directed Chokes
- * Improved Metadata (in work)
- 
 What is supported: 
 
  * Instruments, hits, sample selection, calculation of hit power (same as DGEdit), also loading and saving individual instruments
@@ -25,10 +19,15 @@ What is supported:
  * mute groups (old ones, not directed chokes) 
  * channel selections and routing
  * GM and default MIDI map creation in XML and also in readable text format for reference
+ * Metadata in the drumkit in parallel to the old version
+ * Directed Chokes via it's own dialog 
+ * Clicky Kit feature with simply clicking on the image map to assign colors to the instruments
 
 ## Download 
 
 Version 1.0 (compiled on Ubuntu 18.04 x86_64): [DGPatchMaker 1.0](https://www.onikudaki.net/blog/wp-content/uploads/2020/04/DGPatchMaker-2.zip)
+
+Current head has all features, but cannot be used on standard DrumGizmo kits as the directory structure has to be fixed first (see issue #10).
 
 ## Git Clone
 
