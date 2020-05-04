@@ -160,14 +160,19 @@ initChokedInstruments window tv lm = do
   -- edit call back for editing the channels
   void $ G.on renderer2 edited $ \[i] str -> do
     oldVal <- listStoreGetValue lm i
-    case parse int "" str of
-      Left err ->
-        displayErrorBox window
-          $  "Error: time must be an integer number: "
-          <> T.pack (show err)
-      Right t -> do
-        let newVal = oldVal { chokeTime = t }
+    if null str 
+      then do
+        let newVal = oldVal { chokeTime = Nothing }
         listStoreSetValue lm i newVal
+      else do 
+        case parse int "" str of
+          Left err ->
+            displayErrorBox window
+              $  "Error: time must be an integer number: "
+              <> T.pack (show err)
+          Right t -> do
+            let newVal = oldVal { chokeTime = Just t }
+            listStoreSetValue lm i newVal
 
 
 
@@ -193,7 +198,7 @@ addInstrument diag = do
   instruments <- forM rows
     $ listStoreGetValue (dcTvAvailableInstrumentsModel diag)
   forM_ instruments $ \inst ->
-    listStoreAppend (dcTvChokedInsturmentsModel diag) (ChokeData inst 1000)
+    listStoreAppend (dcTvChokedInsturmentsModel diag) (ChokeData inst Nothing)
 
   -- now remove the instruments
   insts <- listStoreToList (dcTvAvailableInstrumentsModel diag)

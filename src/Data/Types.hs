@@ -76,7 +76,7 @@ newImageData availableInstruments =
 
 data ChokeData = ChokeData {
   chokeInstrument :: !Text
-  , chokeTime :: !Int
+  , chokeTime :: Maybe Int
   } deriving Show
 
 instance Eq ChokeData where 

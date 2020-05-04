@@ -67,9 +67,10 @@ parseInstrument fname = do
           smpls <- tagNoAttr "samples" $ many parseSamples
           return (version, name, smpls)
   case inst of
-    Just (vers, nam, Just smpl) -> do 
+    Just (vers, nam, Just smpl) -> do
       let (path, instFileName) = splitFileName fname
-      return $ Just (InstrumentFile vers nam (pack path) (pack instFileName) Nothing smpl)
+      return $ Just
+        (InstrumentFile vers nam (pack path) (pack instFileName) Nothing smpl)
     _ -> return Nothing
 
 
@@ -164,7 +165,7 @@ instrumentData =
     "channelmap"
     ((,,) <$> requireAttr "in" <*> requireAttr "out" <*> attr "main")
     return
-  mapChokes Nothing = Disabled [] 
+  mapChokes Nothing       = Disabled []
   mapChokes (Just chokes) = Enabled chokes
 
 
@@ -172,14 +173,21 @@ chokeData :: (Monad m, MonadThrow m) => ConduitM Event o m (Maybe [ChokeData])
 chokeData = tagNoAttr "chokes" $ many chokes
  where
   chokes =
-    tag' "choke" ((,) <$> requireAttr "instrument" <*> requireAttr "choketime")
-      $ \(instr, t) -> case signed decimal t of
-          Left err -> throwM
-            (DrumkitParseError
-              ("Error parsing choke: " <> t <> " is not an integer with:" <> (pack err)
+    tag' "choke" ((,) <$> requireAttr "instrument" <*> attr "choketime")
+      $ \(instr, tm) -> case tm of
+          Nothing ->
+            return ChokeData { chokeInstrument = instr, chokeTime = Nothing }
+          Just t -> case signed decimal t of
+            Left err -> throwM
+              (DrumkitParseError
+                (  "Error parsing choke: "
+                <> t
+                <> " is not an integer with:"
+                <> (pack err)
+                )
               )
-            )
-          Right (time, _) -> return $ ChokeData instr time
+            Right (time, _) -> return
+              $ ChokeData { chokeInstrument = instr, chokeTime = Just time }
 
 
 
@@ -209,7 +217,7 @@ conduitMeta = tagNoAttr "metadata" $ do
   auth <- author
   em   <- email
   ws   <- website
-  im  <- imageData
+  im   <- imageData
 
   return MetaData { metaVersion     = v
                   , metaTitle       = t
