@@ -57,6 +57,9 @@ initMainWindow = do
     entrySamplesDir <- builderGetObject builder
                                         castToEntry
                                         ("entrySamplesDirectory" :: Text)
+    entryExportDir <- builderGetObject builder
+                                        castToEntry
+                                        ("entryExportDirectory" :: Text)
 
     progress <- builderGetObject builder
                                  castToProgressBar
@@ -77,6 +80,7 @@ initMainWindow = do
                                    combo
                                    entryBaseDirectory
                                    entrySamplesDir
+                                   entryExportDir
                                    instPages
                                    fhDialog
 
@@ -95,7 +99,7 @@ initMainWindow = do
         let name = "New Instrument" :: Text
         ins <- instrumentPageNew window
                                  notebookInstruments
-                                 entryBaseDirectory
+                                 entryExportDir
                                  entrySamplesDir
                                  combo
                                  instPages

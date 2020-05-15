@@ -67,9 +67,11 @@ data DrumkitPage = DrumkitPage {
     guiDkSampleRate :: Entry,
     guiBaseDir :: Entry,
     guiSamplesDir :: Entry,
+    guiExportDir :: Entry,
     guiBtImportDrumkit :: Button,
     guiBtSetBaseDir :: Button,
     guiBtSetSamplesDir :: Button,
+    guiBtSetExportDir :: Button,
     guiDkInstrumentsNotebook :: Notebook,
     guiDkProgress :: ProgressBar,
     guiTvChannels :: TreeView,
@@ -96,6 +98,7 @@ data DrumkitPage = DrumkitPage {
     guiMetaVersion :: Entry,
     guiMetaTitle :: Entry,
     guiMetaLogo :: Entry,
+    guiMetaBrowse :: Button,
     guiMetaDescription :: TextView,
     guiMetaLicense :: TextView,
     guiMetaNotes :: TextView,
@@ -120,10 +123,11 @@ initDrumkitPage
   -> ComboBox
   -> Entry
   -> Entry
+  -> Entry
   -> IORef (Vector InstrumentPage)
   -> FileHandlingDialog
   -> IO DrumkitPage
-initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir ioref fhDialog
+initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseDirectory entrySamplesDir entryExportDir ioref fhDialog
   = do
 
     buttonImportDrumkit <- builderGetObject builder
@@ -136,6 +140,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     buttonSetSamplesDir <- builderGetObject builder
                                             castToButton
                                             ("buttonSetSamplesDir" :: Text)
+    buttonSetExportDir <- builderGetObject builder
+                                           castToButton
+                                           ("buttonExportDirectory" :: Text)
     buttonConvertToFullMix <- builderGetObject
       builder
       castToButton
@@ -189,6 +196,9 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     evers   <- builderGetObject builder castToEntry ("entryMetaVersion" :: Text)
     etitle  <- builderGetObject builder castToEntry ("entryMetaTitle" :: Text)
     elogo   <- builderGetObject builder castToEntry ("entryMetaLogo" :: Text)
+    ebutton <- builderGetObject builder
+                                castToButton
+                                ("buttonMetaBrowse" :: Text)
     tvdescr <- builderGetObject builder
                                 castToTextView
                                 ("textviewMetaDescription" :: Text)
@@ -257,13 +267,13 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
 
     midiMapGm <- initMidiMap mainWindow
                              tvMidiGM
-                             entryBaseDirectory
+                             entryExportDir
                              gmLoadButton
                              gmExportButton
                              fhDialog
     midiMapDef <- initMidiMap mainWindow
                               tvMidiDef
-                              entryBaseDirectory
+                              entryExportDir
                               defLoadButton
                               defExportButton
                               fhDialog
@@ -319,9 +329,11 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
                           , guiDkSampleRate          = eSr
                           , guiBaseDir               = entryBaseDirectory
                           , guiSamplesDir            = entrySamplesDir
+                          , guiExportDir             = entryExportDir
                           , guiBtImportDrumkit       = buttonImportDrumkit
                           , guiBtSetBaseDir          = buttonSetBaseDir
                           , guiBtSetSamplesDir       = buttonSetSamplesDir
+                          , guiBtSetExportDir        = buttonSetExportDir
                           , guiDkInstrumentsNotebook = instrumentsNotebook
                           , guiDkProgress            = progress
                           , guiErrDiag               = errDiag
@@ -341,6 +353,7 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
                           , guiMetaVersion           = evers
                           , guiMetaTitle             = etitle
                           , guiMetaLogo              = elogo
+                          , guiMetaBrowse            = ebutton
                           , guiMetaDescription       = tvdescr
                           , guiMetaLicense           = tvlicense
                           , guiMetaNotes             = tvnotes
@@ -387,6 +400,10 @@ initDrumkitPage mainWindow builder instrumentsNotebook progress combo entryBaseD
     void $ G.on btDown buttonActivated $ channelDown gui
     void $ G.on btSort buttonActivated $ sortChannels gui
 
+    void $ G.on ebutton buttonActivated $ loadLogo gui
+
+    void $ G.on buttonSetExportDir buttonActivated $ setExportDir gui
+
     void $ G.on metaenable toggled $ do
       ena <- toggleButtonGetActive metaenable
       notebookSetCurrentPage metaNotebook (if ena then 1 else 0)
@@ -412,17 +429,16 @@ getDkName :: DrumkitPage -> IO Text
 getDkName dkp = entryGetText (guiDkName dkp)
 
 
-getMetaDkName :: DrumkitPage -> IO Text 
+getMetaDkName :: DrumkitPage -> IO Text
 getMetaDkName dkp = entryGetText (guiMetaTitle dkp)
 
 getName :: DrumkitPage -> IO (Maybe Text)
-getName dkp = do 
-  nm <- getMetaDkName dkp 
-  if T.null nm 
-    then do 
-      nm2 <- getDkName dkp 
-      if T.null nm2 then return Nothing 
-      else return (Just nm2)
+getName dkp = do
+  nm <- getMetaDkName dkp
+  if T.null nm
+    then do
+      nm2 <- getDkName dkp
+      if T.null nm2 then return Nothing else return (Just nm2)
     else return (Just nm)
 
 
@@ -491,24 +507,24 @@ getDkMetaData dkp = do
   license <- getTxtV (guiMetaLicense dkp)
   notes   <- getTxtV (guiMetaNotes dkp)
 
-  dk' <- readIORef (guiDrumkit dkp)
-  let img = case dk' of 
-        Nothing -> Nothing 
-        Just dk -> case dkInfo dk of 
-          Left _ -> Nothing 
-          Right meta -> metaImage meta 
+  dk'     <- readIORef (guiDrumkit dkp)
+  let img = case dk' of
+        Nothing -> Nothing
+        Just dk -> case dkInfo dk of
+          Left  _    -> Nothing
+          Right meta -> metaImage meta
 
   let !newMeta = MetaData { metaVersion     = vers
-                  , metaTitle       = title
-                  , metaLogo        = logo
-                  , metaDescription = descr
-                  , metaLicense     = license
-                  , metaNotes       = notes
-                  , metaAuthor      = author
-                  , metaEMail       = email
-                  , metaWebsite     = website
-                  , metaImage       = img
-                  }
+                          , metaTitle       = title
+                          , metaLogo        = logo
+                          , metaDescription = descr
+                          , metaLicense     = license
+                          , metaNotes       = notes
+                          , metaAuthor      = author
+                          , metaEMail       = email
+                          , metaWebsite     = website
+                          , metaImage       = img
+                          }
   return newMeta
  where
   toMaybe txt = if T.null txt then Nothing else Just txt
@@ -526,66 +542,54 @@ initParserCombo cb = do
 
 setBaseDir :: DrumkitPage -> IO ()
 setBaseDir mainWindow = do
-  let parentWindow = guiDkParentWindow mainWindow
-  dialog <- fileChooserDialogNew
-    (Just ("Set Base Directory for Imports" :: Text))             --dialog title
-    (Just parentWindow)                     --the parent window
-    FileChooserActionSelectFolder                         --the kind of dialog we want
-    [ ( "gtk-cancel"                                --The buttons to display
-      , ResponseCancel
-      )
-    , ("gtk-open", ResponseAccept)
-    ]
-
   basepath <- entryGetText (guiBaseDir mainWindow)
-  void $ fileChooserSetFilename dialog basepath
-
-  widgetShow dialog
-  resp <- dialogRun dialog
-  case resp of
-    ResponseAccept -> do
-      f <- fileChooserGetFilename dialog
-      case f of
-        Nothing  -> return ()
-        Just dir -> do
-          entrySetText (guiBaseDir mainWindow) dir
-          txt <- entryGetText (guiSamplesDir mainWindow)
-          when (T.null txt) $ entrySetText (guiSamplesDir mainWindow) dir
-    ResponseCancel      -> return ()
-    ResponseDeleteEvent -> return ()
-    _                   -> return ()
-  widgetHide dialog
+  getDirectoryDialog mainWindow "Set Base Directory for Imports" basepath $ \dir -> do 
+    entrySetText (guiBaseDir mainWindow) dir
+    txt <- entryGetText (guiSamplesDir mainWindow)
+    when (T.null txt) $ do 
+      entrySetText (guiSamplesDir mainWindow) dir
+      entrySetText (guiExportDir mainWindow) dir
 
 
 setSamplesDir :: DrumkitPage -> IO ()
 setSamplesDir mainWindow = do
+  loc <- entryGetText (guiSamplesDir mainWindow)
+  getDirectoryDialog mainWindow "Set Sample Base Directory for Imports" loc $ \dir -> do 
+    entrySetText (guiSamplesDir mainWindow) dir
+
+
+setExportDir :: DrumkitPage -> IO ()
+setExportDir mainWindow = do
+  loc <- entryGetText (guiExportDir mainWindow)
+  getDirectoryDialog mainWindow "Set Export Directory" loc $ \dir -> do 
+    entrySetText (guiExportDir mainWindow) dir
+
+
+getDirectoryDialog :: DrumkitPage -> Text -> FilePath -> (FilePath -> IO ()) -> IO () 
+getDirectoryDialog mainWindow title initialDirectory action = do 
   let parentWindow = guiDkParentWindow mainWindow
   dialog <- fileChooserDialogNew
-    (Just ("Set Sample Base Directory for Imports" :: Text))             --dialog title
-    (Just parentWindow)                     --the parent window
-    FileChooserActionSelectFolder                         --the kind of dialog we want
-    [ ( "gtk-cancel"                                --The buttons to display
+    (Just title)             
+    (Just parentWindow)      
+    FileChooserActionCreateFolder 
+    [ ( "gtk-cancel"              
       , ResponseCancel
       )
     , ("gtk-open", ResponseAccept)
     ]
-  loc <- entryGetText (guiSamplesDir mainWindow)
-  void $ fileChooserSetFilename dialog loc
+  void $ fileChooserSetFilename dialog initialDirectory 
 
   widgetShow dialog
   resp <- dialogRun dialog
   case resp of
     ResponseAccept -> do
       f <- fileChooserGetFilename dialog
-      case f of
-        Nothing  -> return ()
-        Just dir -> do
-          entrySetText (guiSamplesDir mainWindow) dir
-          return ()
+      forM_ f action 
     ResponseCancel      -> return ()
     ResponseDeleteEvent -> return ()
     _                   -> return ()
   widgetHide dialog
+
 
 
 
@@ -697,7 +701,7 @@ importDrumDropsDrumKit' gui = do
   doSingleImport progress basedir samplesDir step path = do
     ins <- instrumentPageNew (guiDkParentWindow gui)
                              (guiDkInstrumentsNotebook gui)
-                             (guiBaseDir gui)
+                             (guiExportDir gui)
                              (guiSamplesDir gui)
                              (guiParserCombo gui)
                              (guiDkInstrumentPages gui)
@@ -984,30 +988,30 @@ setupCallbacks gui = do
         forM_ newInst $ listStoreSetValue instViewModel x
       _ -> return ()
 
-  void $ G.on (guiButtonEditClickyKit gui) buttonActivated $ do 
+  void $ G.on (guiButtonEditClickyKit gui) buttonActivated $ do
     availableInstruments <- map cmName <$> listStoreToList instViewModel
-    kit' <- readIORef (guiDrumkit gui)
-    case kit' of 
-      Nothing -> return ()
-      Just kit -> do 
-        case dkInfo kit of 
-          Left _ -> return () 
-          Right meta -> do 
-              let img = case metaImage meta of 
-                          Just image -> image 
-                          Nothing -> newImageData availableInstruments
-              basepath <- entryGetText (guiBaseDir gui)
-              newImg' <- showClickyKitDialog (guiClickyKitDialog gui) img basepath
-              case newImg' of 
-                Nothing -> return () 
-                Just newImg -> do 
-                  let !newMeta = meta { metaImage = Just newImg }
-                      !newDk = kit { dkInfo = Right newMeta }
-                  writeIORef (guiDrumkit gui) (Just newDk)
+    kit'                 <- readIORef (guiDrumkit gui)
+    case kit' of
+      Nothing  -> return ()
+      Just kit -> do
+        case dkInfo kit of
+          Left  _    -> return ()
+          Right meta -> do
+            let img = case metaImage meta of
+                  Just image -> image
+                  Nothing    -> newImageData availableInstruments
+            basepath <- entryGetText (guiExportDir gui)
+            newImg' <- showClickyKitDialog (guiClickyKitDialog gui) img basepath
+            case newImg' of
+              Nothing     -> return ()
+              Just newImg -> do
+                let !newMeta = meta { metaImage = Just newImg }
+                    !newDk   = kit { dkInfo = Right newMeta }
+                writeIORef (guiDrumkit gui) (Just newDk)
 
-  void $ G.on (guiClickyKitCheck gui) toggled $ do 
+  void $ G.on (guiClickyKitCheck gui) toggled $ do
     val <- toggleButtonGetActive (guiClickyKitCheck gui)
-    widgetSetSensitive (guiButtonEditClickyKit gui) val 
+    widgetSetSensitive (guiButtonEditClickyKit gui) val
 
   void $ G.on (guiDkName gui) entryActivated $ do
     nm <- getDkName gui
@@ -1096,15 +1100,14 @@ mapInsts gui f = do
 
 exportDrumKit :: DrumkitPage -> IO ()
 exportDrumKit gui = do
-  basepath <- entryGetText (guiBaseDir gui)
+  basepath <- entryGetText (guiExportDir gui)
   if null basepath
-    then displayErrorBox (guiDkParentWindow gui) "No basepath specified!"
+    then displayErrorBox (guiDkParentWindow gui) "No export path specified!"
     else do
       nm' <- getName gui
-      case nm' of 
-        Nothing -> do         
-          displayErrorBox (guiDkParentWindow gui)
-                             "No drumkit name specified!"
+      case nm' of
+        Nothing -> do
+          displayErrorBox (guiDkParentWindow gui) "No drumkit name specified!"
         Just nm -> withFileHandlingDialog (guiFhDialog gui) $ do
           writeDrumKitFile gui nm basepath
 
@@ -1121,16 +1124,14 @@ writeDrumKitFile gui nm basepath = do
 
 
 writeDrumKitFile' :: DrumkitPage -> Text -> FilePath -> IO ()
-writeDrumKitFile' gui nm basepath = do
-  dir <- createDrumgizmoDirectories basepath
+writeDrumKitFile' gui nm exportPath = do
+  dir <- createDrumgizmoDirectories exportPath
   case dir of
     Left err ->
       displayErrorBox (guiDkParentWindow gui) ("Error during export: " <> err)
     Right () -> do
       drumkit <- getDrumkitGUI gui
-      basedir <- entryGetText (guiBaseDir gui)
-      let dgPath       = getDrumgizmoDir basedir
-          drumkitFName = dgPath </> T.unpack nm <.> ".xml"
+      let drumkitFName = exportPath </> T.unpack nm <.> ".xml"
 
       setDrumkit gui drumkit
 
@@ -1197,7 +1198,7 @@ getDrumkitGUI gui = do
 
 saveDrumkit :: DrumkitPage -> IO ()
 saveDrumkit gui = do
-  basepath <- entryGetText (guiBaseDir gui)
+  basepath <- entryGetText (guiExportDir gui)
   nm       <- T.unpack <$> getDkName gui
 
   let parentWindow = guiDkParentWindow gui
@@ -1212,7 +1213,7 @@ saveDrumkit gui = do
     , ("gtk-save", ResponseAccept)
     ]
 
-  void $ fileChooserSetCurrentFolder dialog (getDrumgizmoDir basepath)
+  void $ fileChooserSetCurrentFolder dialog basepath
   void $ fileChooserSetCurrentName dialog nm
 
 
@@ -1407,11 +1408,12 @@ loadDrumkit' gui file = do
 
       resetDrumkit gui
 
-      let basepath = getBasePath file
+      let basepath = takeDirectory file
           basepathT :: Text
           basepathT = T.pack basepath
       entrySetText (guiBaseDir gui)    basepathT
       entrySetText (guiSamplesDir gui) basepathT
+      entrySetText (guiExportDir gui) basepathT
 
       showDrumkit gui dk
 
@@ -1421,9 +1423,7 @@ loadDrumkit' gui file = do
 
 showDrumkit :: DrumkitPage -> Drumkit -> IO ()
 showDrumkit gui dk = do
-  case dkSampleRate dk of
-    Just sr -> setDkSampleRateText gui sr
-    Nothing -> return ()
+  forM_ (dkSampleRate dk) (setDkSampleRateText gui)
   case dkInfo dk of
     Left descr -> do
       toggleButtonSetActive (guiMetaEnable gui) False
@@ -1450,7 +1450,7 @@ loadInstrumentFiles gui path files = do
     let name = cmName cm
     ins <- instrumentPageNew (guiDkParentWindow gui)
                              (guiDkInstrumentsNotebook gui)
-                             (guiBaseDir gui)
+                             (guiExportDir gui)
                              (guiSamplesDir gui)
                              (guiParserCombo gui)
                              (guiDkInstrumentPages gui)
@@ -1649,3 +1649,39 @@ chanToOrd x =
              | "fullmix" `T.isInfixOf` xx = (8, x)
              | otherwise                  = (100, x)
   in  worker
+
+
+
+
+loadLogo :: DrumkitPage -> IO ()
+loadLogo mainWindow = do
+  let parentWindow = guiDkParentWindow mainWindow
+  dialog <- fileChooserDialogNew
+    (Just ("Select Logo..." :: Text))             --dialog title
+    (Just parentWindow)                     --the parent window
+    FileChooserActionOpen                         --the kind of dialog we want
+    [ ( "gtk-cancel"                                --The buttons to display
+      , ResponseCancel
+      )
+    , ("gtk-open", ResponseAccept)
+    ]
+
+  basepath <- entryGetText (guiExportDir mainWindow)
+  void $ fileChooserSetFilename dialog basepath
+
+  widgetShow dialog
+  resp <- dialogRun dialog
+  case resp of
+    ResponseAccept -> do
+      f <- fileChooserGetFilename dialog
+      case f of
+        Nothing   -> return ()
+        Just logo -> do
+          let path     = takeDirectory logo
+              filename = T.pack (takeFileName logo)
+              newFile  = determinePath basepath path filename
+          entrySetText (guiMetaLogo mainWindow) (T.pack newFile)
+    ResponseCancel      -> return ()
+    ResponseDeleteEvent -> return ()
+    _                   -> return ()
+  widgetHide dialog

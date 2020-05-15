@@ -24,6 +24,7 @@ import           Control.Monad.IO.Class         ( liftIO )
 import           Data.Monoid                    ( (<>) )
 import           Control.Exception              ( bracket
                                                 , catch
+                                                , try
                                                 , SomeException(..)
                                                 )
 
@@ -75,6 +76,7 @@ import           Sound.File.Sndfile.Buffer.Vector
                                                as BV
 
 import           Text.Printf
+import           System.Directory
 
 
 data InstrumentPage = InstrumentPage {
@@ -354,7 +356,6 @@ dragDataGetSignal gui _ _ _ = do
     mapM (listStoreGetValue ls) (P.concat rows)
 
   void $ selectionDataSetText (show r)
-  return ()
 
 
 -- called when a drag and drop was done. The data of the drag and
@@ -363,11 +364,10 @@ dragDataGetSignal gui _ _ _ = do
 dropAction :: InstrumentPage -> [Text] -> IO ()
 dropAction gui x = do
   let res = P.map checkFileNames x
-  case (not . P.null . lefts) res of
-    True -> displayErrorBox
-      (guiMainWindow gui)
-      ("Errors: " `append` (T.intercalate "\n" (lefts res)))
-    False -> do
+  if (not . P.null . lefts) res
+    then displayErrorBox (guiMainWindow gui)
+                         ("Errors: " `append` T.intercalate "\n" (lefts res))
+    else do
       basepath <- entryGetText (guiIPEntryBaseDir gui)
       af       <- getAudioSamplesFromFiles (guiUpdateSampleRate gui)
                                            (unpack basepath)
@@ -390,8 +390,8 @@ dropActionHit gui point txt = do
   pos <- treeViewConvertWidgetToTreeCoords (guiInstHitView gui) point
   res <- treeViewGetPathAtPos tv pos
   case res of
-    Nothing                -> return ()
-    Just ((idx : _), _, _) -> do
+    Nothing              -> return ()
+    Just (idx : _, _, _) -> do
         -- get the selected hit sample and remove the audio samples
         -- then get the drop destination hit sample and add the samples
       sel              <- treeViewGetSelection (guiInstHitView gui)
@@ -750,7 +750,9 @@ instrumentPageSetInstrumentFile instPage instrumentFile = do
   entrySetText (guiEntryName instPage)    (ifName instrumentFile)
   entrySetText (guiEntryType instPage)
                (maybe "" (pack . show) (ifType instrumentFile))
+  entrySetText (guiInstPath instPage) (ifFilePath instrumentFile)
   entrySetText (guiEntryFileName instPage) (ifFileName instrumentFile)
+
 
   let model = guiInstHitViewModel instPage
 
@@ -851,8 +853,8 @@ setupCallbacks instPage = do
                   listStoreSetValue (guiInstHitViewModel instPage) idx hsVal'
                 _ -> return ()
 
-    mapM_ (setSingleChannel stri hitSampleP)
-          ((P.map P.head . P.filter (not . P.null)) paths)
+    mapM_ (setSingleChannel stri hitSampleP . P.head)
+          (P.filter (not . P.null) paths)
 
 
   -- callback for editing the file channel
@@ -885,8 +887,6 @@ setupCallbacks instPage = do
         comboListStore <- comboBoxSetModelText (castToComboBox widget)
         mapM_ (listStoreAppend comboListStore) chanList
       _ -> return ()
-
-  return ()
 
 
 treeViewIsSelected :: TreeView -> IO Bool
@@ -1078,7 +1078,6 @@ exportInstrument instPage = do
       ("Successfully exported instrument (" `append` pack filename `append` ")")
 
 
-
 instrumentPageWriteInstrumentFile :: InstrumentPage -> IO (Either Text FilePath)
 instrumentPageWriteInstrumentFile instPage = do
   i <- getInstrumentFromGUI instPage
@@ -1087,14 +1086,12 @@ instrumentPageWriteInstrumentFile instPage = do
     Right instrumentFile -> do
       storeInstrument instPage instrumentFile
 
-      basepath <- entryGetText (guiIPEntryBaseDir instPage)
+      basepath <- getInstrumentDir instPage
+      let filename = basepath </> T.unpack (ifFileName instrumentFile)
 
-      let dgInstrumentsPath = getInstrumentDir basepath
-          filename = dgInstrumentsPath </> T.unpack (ifFileName instrumentFile)
-
-      dirs <- createDrumgizmoDirectories basepath
+      dirs <- try $ createDirectoryIfMissing True basepath
       case dirs of
-        Left  err -> return $ Left err
+        Left  err -> return $ Left (T.pack (show (err :: SomeException)))
         Right _   -> do
           res <-
             askUserForOverwriteIfNecessary (guiInstFhDialog instPage) filename
@@ -1202,6 +1199,9 @@ instrumentPageGetInstrumentFile gui = do
       return $ Right instrumentFile
 
 
+getInstrumentDir :: InstrumentPage -> IO FilePath
+getInstrumentDir gui = entryGetText (guiInstPath gui)
+
 
 calcPower :: InstrumentPage -> IO ()
 calcPower gui = do
@@ -1222,7 +1222,7 @@ calcPower gui = do
 
       unless (P.null afs) $ do
           -- do the calculation
-        res <- mapM (calcHit basepath attack spread) afs
+        res <- mapM (calcHit attack spread) afs
 
         if not (P.null (lefts res))
           then do
@@ -1236,23 +1236,22 @@ calcPower gui = do
             -- update the hit view
             updateHitSample gui hsReplaceSamples files
  where
-  calcHit
-    :: FilePath -> Int -> Double -> AudioFile -> IO (Either Text AudioFile)
-  calcHit basepath attack spread x = do
+  calcHit :: Int -> Double -> AudioFile -> IO (Either Text AudioFile)
+  calcHit attack spread x = do
     catch
-      (calcHit' basepath attack spread x >>= return . Right)
+      (calcHit' attack spread x >>= return . Right)
       (\e -> do
-        let path = getInstrumentDir basepath </> afPath x
+        basepath <- getInstrumentDir gui
+        let path = basepath </> afPath x
         return $ Left
-          (        "Error reading file: "
-          `append` pack path
-          `append` ": "
-          `append` (pack (show (e :: SomeException)))
+          ("Error reading file: " `append` pack path `append` ": " `append` pack
+            (show (e :: SomeException))
           )
       )
-  calcHit' :: FilePath -> Int -> Double -> AudioFile -> IO AudioFile
-  calcHit' basepath attack spread x = do
-    let path = getInstrumentDir basepath </> afPath x
+  calcHit' :: Int -> Double -> AudioFile -> IO AudioFile
+  calcHit' attack spread x = do
+    basepath <- getInstrumentDir gui
+    let path = basepath </> afPath x
     T.putStrLn $ "Calc Hit Power path: " `append` pack path
     info <- getFileInfo path
     bracket
@@ -1314,10 +1313,8 @@ getXMLFile gui = do
     , ("gtk-open", ResponseAccept)
     ]
 
-  basedir <- entryGetText (guiIPEntryBaseDir gui) :: IO Text
-  let dgdir = getDrumgizmoDir (unpack basedir)
-
-  void $ fileChooserSetCurrentFolder dialog dgdir
+  basedir <- entryGetText (guiIPEntryBaseDir gui)
+  void $ fileChooserSetCurrentFolder dialog basedir
 
   xmlFilter <- fileFilterNew
   fileFilterSetName xmlFilter ("XML" :: Text)

@@ -114,8 +114,7 @@ importInstrumentFile path = do
   catches worker [Handler handler, Handler handler2]
  where
   worker = do
-    iF <- runConduitRes $ parseFile def path .| parseInstrument
-      (takeFileName path)
+    iF <- runConduitRes $ parseFile def path .| parseInstrument path 
     return (maybe (Left "Could not parse file") Right iF)
   handler e = return (Left (dkpeMsg e))
   handler2 XmlException {..} = do

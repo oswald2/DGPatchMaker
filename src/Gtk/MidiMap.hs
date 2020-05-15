@@ -14,7 +14,7 @@ import ClassyPrelude
 
 import Data.Types
 import Data.Checkers
-import Data.Drumgizmo
+--import Data.Drumgizmo
 import Data.Import
 import Data.Export
 
@@ -243,8 +243,7 @@ cbImportMidiMap gui = do
                ,ResponseCancel)
               ,("gtk-open"
                , ResponseAccept)]
-    basepath <- entryGetText (mmBasePath gui)
-    let path = getDrumgizmoDir basepath
+    path <- entryGetText (mmBasePath gui)
     void $ fileChooserSetFilename dialog path
 
     widgetShow dialog
@@ -274,8 +273,7 @@ cbExportMidiMap gui = do
                ,ResponseCancel)
               ,("gtk-save"
                , ResponseAccept)]
-    basepath <- entryGetText (mmBasePath gui)
-    let path = getDrumgizmoDir basepath
+    path <- entryGetText (mmBasePath gui)
     void $ fileChooserSetFilename dialog path
 
     widgetShow dialog
@@ -306,7 +304,7 @@ writeMidiMapFile' gui filename midimap = do
     basepath <- entryGetText (mmBasePath gui)
     let
         content2 = convertToTabSep midimap
-        path = getDrumgizmoDir basepath </> unpack filename
+        path = basepath </> unpack filename
         path2 = replaceExtension path ".txt"
 
     res <- askUserForOverwriteIfNecessary (mmFhDialog gui) path $ writeMidiMapXML midimap path
