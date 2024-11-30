@@ -18,7 +18,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-14.27
+resolver: lts-21.25
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -39,14 +39,12 @@ packages:
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 extra-deps:
-- cairo-0.13.8.0
-- gio-0.13.8.0
-- glib-0.13.8.0
-- gtk2hs-buildtools-0.13.8.0
-- gtk3-0.15.4
-- hsndfile-0.8.0
-- hsndfile-vector-0.5.2
-- pango-0.13.8.0
+- cairo-0.13.11.0
+- gio-0.13.11.0
+- glib-0.13.11.0
+- gtk2hs-buildtools-0.13.11.0
+- gtk3-0.15.9
+- pango-0.13.11.0
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
